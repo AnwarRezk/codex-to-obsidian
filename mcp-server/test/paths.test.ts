@@ -40,12 +40,55 @@ async function withEnv(
   }
 }
 
-async function withTempHome(
+async function withTempConfigHome(
   run: (configHome: string) => Promise<void>,
 ): Promise<void> {
   const root = await mkdtemp(path.join(os.tmpdir(), "codex-obsidian-"));
-  const appData = path.join(root, "AppData", "Roaming");
-  await run(appData);
+  await run(root);
+}
+
+function getPlatformConfigPath(configHome: string): string {
+  if (process.platform === "win32") {
+    return path.join(configHome, "codex-to-obsidian", "config.json");
+  }
+
+  if (process.platform === "darwin") {
+    return path.join(
+      configHome,
+      "Library",
+      "Application Support",
+      "codex-to-obsidian",
+      "config.json",
+    );
+  }
+
+  return path.join(configHome, "codex-to-obsidian", "config.json");
+}
+
+function getPlatformEnvPatch(
+  configHome: string,
+): Record<string, string | undefined> {
+  if (process.platform === "win32") {
+    return {
+      APPDATA: path.join(configHome, "AppData", "Roaming"),
+      XDG_CONFIG_HOME: undefined,
+      HOME: undefined,
+    };
+  }
+
+  if (process.platform === "darwin") {
+    return {
+      APPDATA: undefined,
+      XDG_CONFIG_HOME: undefined,
+      HOME: path.join(configHome, "home"),
+    };
+  }
+
+  return {
+    APPDATA: undefined,
+    XDG_CONFIG_HOME: path.join(configHome, ".config"),
+    HOME: undefined,
+  };
 }
 
 test("valid relative note path resolves inside the configured folder", () => {
@@ -121,18 +164,19 @@ test("filename containing a null byte is rejected", () => {
 });
 
 test("default configured folder is Codex/Conversations", async () => {
-  await withTempHome(async (appData) => {
+  await withTempConfigHome(async (configHome) => {
+    const envPatch = getPlatformEnvPatch(configHome);
+    const configPath = getPlatformConfigPath(
+      process.platform === "win32"
+        ? envPatch.APPDATA ?? configHome
+        : process.platform === "darwin"
+          ? envPatch.HOME ?? configHome
+          : envPatch.XDG_CONFIG_HOME ?? configHome,
+    );
+
     await withEnv(
-      {
-        APPDATA: appData,
-        CODEX_OBSIDIAN_VAULT: undefined,
-      },
+      { ...envPatch, CODEX_OBSIDIAN_VAULT: undefined },
       async () => {
-        const configPath = path.join(
-          appData,
-          "codex-to-obsidian",
-          "config.json",
-        );
         await mkdir(path.dirname(configPath), { recursive: true });
         await writeFile(
           configPath,
@@ -150,12 +194,11 @@ test("default configured folder is Codex/Conversations", async () => {
 });
 
 test("environment override uses CODEX_OBSIDIAN_VAULT", async () => {
-  await withTempHome(async (appData) => {
+  await withTempConfigHome(async (configHome) => {
+    const envPatch = getPlatformEnvPatch(configHome);
+
     await withEnv(
-      {
-        APPDATA: appData,
-        CODEX_OBSIDIAN_VAULT: "C:\\temp-vault",
-      },
+      { ...envPatch, CODEX_OBSIDIAN_VAULT: "C:\\temp-vault" },
       async () => {
         const config = await loadConfig();
 
@@ -166,13 +209,52 @@ test("environment override uses CODEX_OBSIDIAN_VAULT", async () => {
   });
 });
 
-test("saveConfig persists the vault root and configured folder", async () => {
-  await withTempHome(async (appData) => {
+test("environment override preserves a configured relative folder", async () => {
+  await withTempConfigHome(async (configHome) => {
+    const envPatch = getPlatformEnvPatch(configHome);
+    const configPath = getPlatformConfigPath(
+      process.platform === "win32"
+        ? envPatch.APPDATA ?? configHome
+        : process.platform === "darwin"
+          ? envPatch.HOME ?? configHome
+          : envPatch.XDG_CONFIG_HOME ?? configHome,
+    );
+
     await withEnv(
-      {
-        APPDATA: appData,
-        CODEX_OBSIDIAN_VAULT: undefined,
+      { ...envPatch, CODEX_OBSIDIAN_VAULT: "C:\\temp-vault" },
+      async () => {
+        await mkdir(path.dirname(configPath), { recursive: true });
+        await writeFile(
+          configPath,
+          JSON.stringify({
+            vaultRoot: "C:\\vault",
+            relativeSubfolder: "Inbox\\Daily",
+          }),
+          "utf8",
+        );
+
+        const config = await loadConfig();
+
+        assert.equal(config.vaultRoot, "C:\\temp-vault");
+        assert.equal(config.relativeSubfolder, "Inbox/Daily");
       },
+    );
+  });
+});
+
+test("saveConfig persists the vault root and configured folder", async () => {
+  await withTempConfigHome(async (configHome) => {
+    const envPatch = getPlatformEnvPatch(configHome);
+    const configPath = getPlatformConfigPath(
+      process.platform === "win32"
+        ? envPatch.APPDATA ?? configHome
+        : process.platform === "darwin"
+          ? envPatch.HOME ?? configHome
+          : envPatch.XDG_CONFIG_HOME ?? configHome,
+    );
+
+    await withEnv(
+      { ...envPatch, CODEX_OBSIDIAN_VAULT: undefined },
       async () => {
         const config: VaultConfig = {
           vaultRoot: "C:\\vault",
@@ -181,11 +263,6 @@ test("saveConfig persists the vault root and configured folder", async () => {
 
         await saveConfig(config);
 
-        const configPath = path.join(
-          appData,
-          "codex-to-obsidian",
-          "config.json",
-        );
         const fileContents = await readFile(configPath, "utf8");
 
         assert.deepEqual(JSON.parse(fileContents), config);

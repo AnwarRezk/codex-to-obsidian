@@ -43,6 +43,15 @@ export function normalizeRelativePath(input: string): string {
   return normalized.replace(/^\/+/, "").replace(/\/+$/, "");
 }
 
+function isMissingFileError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "ENOENT"
+  );
+}
+
 function getConfigPath(): string {
   if (process.platform === "win32") {
     const appData =
@@ -69,29 +78,46 @@ function getConfigPath(): string {
 
 export async function loadConfig(): Promise<VaultConfig> {
   const vaultRootOverride = process.env.CODEX_OBSIDIAN_VAULT?.trim();
-  const relativeSubfolder = DEFAULT_SUBFOLDER;
+  const configPath = getConfigPath();
+  try {
+    const rawConfig = await readFile(configPath, "utf8");
+    const parsedConfig = JSON.parse(rawConfig) as Partial<VaultConfig>;
+    const relativeSubfolder = normalizeRelativePath(
+      parsedConfig.relativeSubfolder ?? DEFAULT_SUBFOLDER,
+    );
 
-  if (vaultRootOverride) {
+    if (vaultRootOverride) {
+      return {
+        vaultRoot: path.resolve(vaultRootOverride),
+        relativeSubfolder,
+      };
+    }
+
+    if (
+      typeof parsedConfig.vaultRoot !== "string" ||
+      !parsedConfig.vaultRoot.trim()
+    ) {
+      throw new Error("Vault root is required in config");
+    }
+
     return {
-      vaultRoot: path.resolve(vaultRootOverride),
+      vaultRoot: path.resolve(parsedConfig.vaultRoot.trim()),
       relativeSubfolder,
     };
+  } catch (error) {
+    if (!isMissingFileError(error)) {
+      throw error;
+    }
+
+    if (vaultRootOverride) {
+      return {
+        vaultRoot: path.resolve(vaultRootOverride),
+        relativeSubfolder: DEFAULT_SUBFOLDER,
+      };
+    }
+
+    throw error;
   }
-
-  const configPath = getConfigPath();
-  const rawConfig = await readFile(configPath, "utf8");
-  const parsedConfig = JSON.parse(rawConfig) as Partial<VaultConfig>;
-
-  if (typeof parsedConfig.vaultRoot !== "string" || !parsedConfig.vaultRoot.trim()) {
-    throw new Error("Vault root is required in config");
-  }
-
-  return {
-    vaultRoot: path.resolve(parsedConfig.vaultRoot.trim()),
-    relativeSubfolder: normalizeRelativePath(
-      parsedConfig.relativeSubfolder ?? DEFAULT_SUBFOLDER,
-    ),
-  };
 }
 
 export async function saveConfig(config: VaultConfig): Promise<void> {

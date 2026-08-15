@@ -37,3 +37,72 @@ Limitation.
 
 - `tsc` and the package-local `tsx` runner were not available in this workspace, so I could not run the exact `npm test -- --test-name-pattern=...` or `npm run build` commands locally.
 - I did not wait on network or install dependencies.
+
+## Fix Round 1
+
+Files changed.
+
+- `mcp-server/package.json`.
+- `mcp-server/src/config.ts`.
+- `mcp-server/test/paths.test.ts`.
+
+How the review findings were addressed.
+
+- Switched `npm test` to the existing `tsx`-based Node test runner so `npm test -- --test-name-pattern=...` targets the real test files without adding dependencies.
+- Updated `loadConfig()` so `CODEX_OBSIDIAN_VAULT` only overrides `vaultRoot`, while a present config file still supplies and normalizes `relativeSubfolder`.
+- Preserved the default `Codex/Conversations` folder only when the config file is missing and the env override is present.
+- Made the tests create config files under the current platform's config-home branch so the platform-specific config path is actually exercised.
+
+Exact commands run and outputs.
+
+```powershell
+git -C 'C:\Users\arezk\Documents\Codex\2026-08-16\openai-s-current-harness-guidance-3\work\codex-to-obsidian' diff --check
+```
+
+Output.
+
+```text
+```
+
+```powershell
+node $env:TEMP\codex-obsidian-fix1-smoke\smoke.mjs
+```
+
+Output.
+
+```text
+Task 2 fix-round smoke check passed
+```
+
+```powershell
+npm test -- --test-name-pattern="traversal|absolute|configured folder|environment|valid"
+```
+
+Output.
+
+```text
+> codex-to-obsidian-mcp-server@0.1.0 test
+> tsx --test test/**/*.test.ts --test-name-pattern=traversal|absolute|configured folder|environment|valid
+
+'tsx' is not recognized as an internal or external command,
+operable program or batch file.
+```
+
+```powershell
+npm run build
+```
+
+Output.
+
+```text
+> codex-to-obsidian-mcp-server@0.1.0 build
+> tsc -p tsconfig.json
+
+'tsc' is not recognized as an internal or external command,
+operable program or batch file.
+```
+
+Unavailable tooling.
+
+- `tsc` was not installed in this workspace.
+- `tsx` was not installed in this workspace.
