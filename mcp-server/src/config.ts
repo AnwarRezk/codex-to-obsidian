@@ -79,19 +79,32 @@ function getConfigPath(): string {
 export async function loadConfig(): Promise<VaultConfig> {
   const vaultRootOverride = process.env.CODEX_OBSIDIAN_VAULT?.trim();
   const configPath = getConfigPath();
+
+  if (vaultRootOverride) {
+    try {
+      const rawConfig = await readFile(configPath, "utf8");
+      const parsedConfig = JSON.parse(rawConfig) as Partial<VaultConfig>;
+
+      return {
+        vaultRoot: path.resolve(vaultRootOverride),
+        relativeSubfolder: normalizeRelativePath(
+          parsedConfig.relativeSubfolder ?? DEFAULT_SUBFOLDER,
+        ),
+      };
+    } catch {
+      return {
+        vaultRoot: path.resolve(vaultRootOverride),
+        relativeSubfolder: DEFAULT_SUBFOLDER,
+      };
+    }
+  }
+
   try {
     const rawConfig = await readFile(configPath, "utf8");
     const parsedConfig = JSON.parse(rawConfig) as Partial<VaultConfig>;
     const relativeSubfolder = normalizeRelativePath(
       parsedConfig.relativeSubfolder ?? DEFAULT_SUBFOLDER,
     );
-
-    if (vaultRootOverride) {
-      return {
-        vaultRoot: path.resolve(vaultRootOverride),
-        relativeSubfolder,
-      };
-    }
 
     if (
       typeof parsedConfig.vaultRoot !== "string" ||
@@ -105,15 +118,8 @@ export async function loadConfig(): Promise<VaultConfig> {
       relativeSubfolder,
     };
   } catch (error) {
-    if (!isMissingFileError(error)) {
+    if (isMissingFileError(error)) {
       throw error;
-    }
-
-    if (vaultRootOverride) {
-      return {
-        vaultRoot: path.resolve(vaultRootOverride),
-        relativeSubfolder: DEFAULT_SUBFOLDER,
-      };
     }
 
     throw error;

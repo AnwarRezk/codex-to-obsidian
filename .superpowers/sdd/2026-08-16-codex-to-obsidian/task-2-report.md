@@ -106,3 +106,73 @@ Unavailable tooling.
 
 - `tsc` was not installed in this workspace.
 - `tsx` was not installed in this workspace.
+
+## Fix Round 2
+
+Files changed.
+
+- `mcp-server/src/config.ts`.
+- `mcp-server/test/paths.test.ts`.
+
+How the re-review finding was addressed.
+
+- Moved the `CODEX_OBSIDIAN_VAULT` override path ahead of the strict config read so the explicit override always wins.
+- When the config file loads successfully, the override still reuses a valid configured `relativeSubfolder`.
+- When the config file is missing, malformed, or otherwise unreadable under override mode, the override now falls back to `DEFAULT_SUBFOLDER`.
+- Left the no-override path strict so malformed or non-ENOENT config errors still surface.
+- Added a regression test that combines a malformed config file with `CODEX_OBSIDIAN_VAULT`.
+
+Exact commands run and outputs.
+
+```powershell
+node $env:TEMP\codex-obsidian-fix1-smoke\smoke.mjs
+```
+
+Output.
+
+```text
+Task 2 fix-round smoke check passed
+```
+
+Unavailable tooling.
+
+- `npm test` and `npm run build` had not yet been rerun at the time of this report update.
+
+## Fix Round 2
+
+Files changed.
+
+- `mcp-server/src/config.ts`.
+- `mcp-server/test/paths.test.ts`.
+
+How the re-review finding was addressed.
+
+- Moved the `CODEX_OBSIDIAN_VAULT` override ahead of the strict config read so the explicit override wins even when the config file is missing or malformed.
+- Preserved a valid configured `relativeSubfolder` when the config parses successfully.
+- Fell back to `DEFAULT_SUBFOLDER` for override mode when the config file is missing, malformed, or otherwise unusable.
+- Kept the strict no-override path intact so malformed or non-ENOENT config errors still surface.
+- Added a regression test for a malformed config file plus `CODEX_OBSIDIAN_VAULT`.
+
+Exact commands run and outputs.
+
+```powershell
+node --experimental-strip-types $env:TEMP\codex-obsidian-fix2-smoke.mjs
+```
+
+Output.
+
+```text
+Task 2 fix round 2 smoke check passed
+```
+
+```powershell
+git -C 'C:\Users\arezk\Documents\Codex\2026-08-16\openai-s-current-harness-guidance-3\work\codex-to-obsidian' diff --check
+```
+
+Output.
+
+```text
+warning: in the working copy of '.superpowers/sdd/2026-08-16-codex-to-obsidian/task-2-report.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mcp-server/src/config.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mcp-server/test/paths.test.ts', LF will be replaced by CRLF the next time Git touches it
+```

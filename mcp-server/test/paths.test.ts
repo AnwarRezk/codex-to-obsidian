@@ -242,6 +242,32 @@ test("environment override preserves a configured relative folder", async () => 
   });
 });
 
+test("environment override falls back to the default folder when the config file is malformed", async () => {
+  await withTempConfigHome(async (configHome) => {
+    const envPatch = getPlatformEnvPatch(configHome);
+    const configPath = getPlatformConfigPath(
+      process.platform === "win32"
+        ? envPatch.APPDATA ?? configHome
+        : process.platform === "darwin"
+          ? envPatch.HOME ?? configHome
+          : envPatch.XDG_CONFIG_HOME ?? configHome,
+    );
+
+    await withEnv(
+      { ...envPatch, CODEX_OBSIDIAN_VAULT: "C:\\temp-vault" },
+      async () => {
+        await mkdir(path.dirname(configPath), { recursive: true });
+        await writeFile(configPath, "{ not valid json", "utf8");
+
+        const config = await loadConfig();
+
+        assert.equal(config.vaultRoot, "C:\\temp-vault");
+        assert.equal(config.relativeSubfolder, DEFAULT_SUBFOLDER);
+      },
+    );
+  });
+});
+
 test("saveConfig persists the vault root and configured folder", async () => {
   await withTempConfigHome(async (configHome) => {
     const envPatch = getPlatformEnvPatch(configHome);
