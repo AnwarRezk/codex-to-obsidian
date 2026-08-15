@@ -77,11 +77,9 @@ Configure the server to run the built file with Node:
 
 ```json
 {
-  "mcp_servers": {
-    "codex-to-obsidian": {
-      "command": "node",
-      "args": ["./mcp-server/dist/server.js"]
-    }
+  "codex-to-obsidian": {
+    "command": "node",
+    "args": ["./mcp-server/dist/server.js"]
   }
 }
 ```
