@@ -1,0 +1,19 @@
+{
+  "name": "codex-to-obsidian",
+  "version": "0.1.0",
+  "description": "Save Codex conversation summaries as safe, updateable Markdown notes in Obsidian.",
+  "author": {
+    "name": "OpenAI"
+  },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Codex to Obsidian",
+    "shortDescription": "Save Codex summaries to Obsidian",
+    "longDescription": "Desktop-local plugin scaffold for saving and updating Codex conversation summaries as Markdown notes in Obsidian.",
+    "developerName": "OpenAI",
+    "category": "Productivity",
+    "capabilities": ["Write"],
+    "defaultPrompt": ["Save this conversation to Obsidian."]
+  }
+}
