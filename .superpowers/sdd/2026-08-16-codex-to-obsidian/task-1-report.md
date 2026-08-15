@@ -200,3 +200,66 @@ Assessment.
 
 - The direct-map `.mcp.json` matches the reviewer instruction and parses as JSON.
 - The bundled validator still cannot be exercised past import time on this machine because `yaml` is missing, so I could not confirm it against the direct-map shape without a shim.
+
+## Fix Round 3
+
+Files changed.
+
+- `.codex-plugin/plugin.json`.
+- `.superpowers/sdd/2026-08-16-codex-to-obsidian/task-1-report.md`.
+
+How the reviewer finding was addressed.
+
+- Removed the unrequested `author` block from the plugin manifest.
+- Removed the unrequested `interface` block from the plugin manifest.
+- Kept the direct server map in `.mcp.json` unchanged.
+- Left the Task 1 plan and brief unchanged because their manifest example already matched the minimal required fields.
+
+Exact commands run and outputs.
+
+```powershell
+Get-Content -Raw 'C:\Users\arezk\Documents\Codex\2026-08-16\openai-s-current-harness-guidance-3\work\codex-to-obsidian\.codex-plugin\plugin.json' | ConvertFrom-Json | Out-Null; 'plugin json ok'
+```
+
+Output.
+
+```text
+plugin json ok
+```
+
+```powershell
+Get-Content -Raw 'C:\Users\arezk\Documents\Codex\2026-08-16\openai-s-current-harness-guidance-3\work\codex-to-obsidian\.mcp.json' | ConvertFrom-Json | Out-Null; 'mcp json ok'
+```
+
+Output.
+
+```text
+mcp json ok
+```
+
+```powershell
+git -C 'C:\Users\arezk\Documents\Codex\2026-08-16\openai-s-current-harness-guidance-3\work\codex-to-obsidian' diff --check
+```
+
+Output.
+
+```text
+warning: in the working copy of '.codex-plugin/plugin.json', LF will be replaced by CRLF the next time Git touches it
+```
+
+```powershell
+py -3 'C:\Users\arezk\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py' 'C:\Users\arezk\Documents\Codex\2026-08-16\openai-s-current-harness-guidance-3\work\codex-to-obsidian'
+```
+
+Output.
+
+```text
+Traceback (most recent call last):
+  File "C:\Users\arezk\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py", line 13, in <module>
+    import yaml
+ModuleNotFoundError: No module named 'yaml'
+```
+
+Limitation.
+
+- The bundled validator remains unavailable without PyYAML, and I did not use a fake shim.
