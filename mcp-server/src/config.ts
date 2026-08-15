@@ -43,15 +43,6 @@ export function normalizeRelativePath(input: string): string {
   return normalized.replace(/^\/+/, "").replace(/\/+$/, "");
 }
 
-function isMissingFileError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as NodeJS.ErrnoException).code === "ENOENT"
-  );
-}
-
 function getConfigPath(): string {
   if (process.platform === "win32") {
     const appData =
@@ -99,31 +90,23 @@ export async function loadConfig(): Promise<VaultConfig> {
     }
   }
 
-  try {
-    const rawConfig = await readFile(configPath, "utf8");
-    const parsedConfig = JSON.parse(rawConfig) as Partial<VaultConfig>;
-    const relativeSubfolder = normalizeRelativePath(
-      parsedConfig.relativeSubfolder ?? DEFAULT_SUBFOLDER,
-    );
+  const rawConfig = await readFile(configPath, "utf8");
+  const parsedConfig = JSON.parse(rawConfig) as Partial<VaultConfig>;
+  const relativeSubfolder = normalizeRelativePath(
+    parsedConfig.relativeSubfolder ?? DEFAULT_SUBFOLDER,
+  );
 
-    if (
-      typeof parsedConfig.vaultRoot !== "string" ||
-      !parsedConfig.vaultRoot.trim()
-    ) {
-      throw new Error("Vault root is required in config");
-    }
-
-    return {
-      vaultRoot: path.resolve(parsedConfig.vaultRoot.trim()),
-      relativeSubfolder,
-    };
-  } catch (error) {
-    if (isMissingFileError(error)) {
-      throw error;
-    }
-
-    throw error;
+  if (
+    typeof parsedConfig.vaultRoot !== "string" ||
+    !parsedConfig.vaultRoot.trim()
+  ) {
+    throw new Error("Vault root is required in config");
   }
+
+  return {
+    vaultRoot: path.resolve(parsedConfig.vaultRoot.trim()),
+    relativeSubfolder,
+  };
 }
 
 export async function saveConfig(config: VaultConfig): Promise<void> {

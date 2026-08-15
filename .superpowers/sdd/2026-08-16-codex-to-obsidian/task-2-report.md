@@ -176,3 +176,25 @@ warning: in the working copy of '.superpowers/sdd/2026-08-16-codex-to-obsidian/t
 warning: in the working copy of 'mcp-server/src/config.ts', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'mcp-server/test/paths.test.ts', LF will be replaced by CRLF the next time Git touches it
 ```
+
+## Fix Round 3
+
+Files changed.
+
+- `mcp-server/src/config.ts`.
+
+How the cleanup was applied.
+
+- Removed the redundant `isMissingFileError` helper.
+- Removed the no-override try/catch that immediately rethrew and kept the strict direct-read path.
+
+Exact commands run and outputs.
+
+```powershell
+git -C 'C:\Users\arezk\Documents\Codex\2026-08-16\openai-s-current-harness-guidance-3\work\codex-to-obsidian' diff --check
+```
+
+Output.
+
+```text
+```
