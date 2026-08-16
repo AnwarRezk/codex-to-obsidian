@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -181,6 +181,30 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       /[A-Za-z]:\\|[A-Za-z]:\//,
     );
 
+    const unsafeVaultPath = path.join(os.tmpdir(), "codex-task5-unsafe-vault.txt");
+    await writeFile(unsafeVaultPath, "not a folder", "utf8");
+    process.env.CODEX_OBSIDIAN_VAULT = unsafeVaultPath;
+
+    const unsafeErrorResult = await client.callTool({
+      name: "get_status",
+      arguments: {},
+    });
+
+    assert.deepEqual(unsafeErrorResult.structuredContent, {
+      status: "error",
+      message: "required or invalid config",
+    });
+    assert.equal(
+      unsafeErrorResult.content[0] && "text" in unsafeErrorResult.content[0]
+        ? unsafeErrorResult.content[0].text
+        : "",
+      "status=error message=required or invalid config",
+    );
+    assert.doesNotMatch(
+      JSON.stringify(unsafeErrorResult),
+      /[A-Za-z]:\\|[A-Za-z]:\//,
+    );
+
     const aliasTargetRoot = await mkdtemp(
       path.join(os.tmpdir(), "codex-task5-alias-target-"),
     );
@@ -220,6 +244,42 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
           aliasClient.connect(aliasClientTransport),
           aliasServer.connect(aliasServerTransport),
         ]);
+
+        const aliasDraft = {
+          title: "Alias smoke",
+          codex_key: "alias-key",
+          relativePath: "Codex/Conversations/Note.md",
+          created: "2026-08-16T12:00:00Z",
+          updated: "2026-08-16T12:15:00Z",
+          summary: "Created through the alias root.",
+          decisions: [],
+          actionItems: [],
+          openQuestions: [],
+          sourceUrl: "https://example.test/share/alias-key",
+        };
+
+        const aliasCreated = await aliasClient.callTool({
+          name: "create_note",
+          arguments: aliasDraft,
+        });
+
+        assert.deepEqual(aliasCreated.structuredContent, {
+          status: "created",
+          relativePath: "Codex/Conversations/Note.md",
+          codex_key: "alias-key",
+        });
+
+        const aliasFound = await aliasClient.callTool({
+          name: "find_note",
+          arguments: { codex_key: "alias-key" },
+        });
+
+        assert.deepEqual(aliasFound.structuredContent, {
+          status: "found",
+          codex_key: "alias-key",
+          matchCount: 1,
+          relativePaths: ["Codex/Conversations/Note.md"],
+        });
 
         const aliasResult = await aliasClient.callTool({
           name: "open_note",

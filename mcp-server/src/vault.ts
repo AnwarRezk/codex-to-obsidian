@@ -268,7 +268,7 @@ export async function findNote(
   const matches = await readMatchingMarkdownFiles(
     vaultFolder,
     realVaultFolder,
-    realVaultRoot,
+    config.vaultRoot,
     codexKey,
     realConfiguredFolderReference,
   );

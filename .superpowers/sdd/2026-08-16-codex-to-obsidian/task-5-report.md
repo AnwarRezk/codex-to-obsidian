@@ -212,3 +212,64 @@ Limitations.
 
 - The symlinked-root smoke path only runs when the platform allows creating the alias directory link.
 - The CRLF warnings from `git diff --check` remain benign in this Windows workspace.
+
+## Fix Round 3
+
+Files changed.
+
+- `mcp-server/src/server.ts`.
+- `mcp-server/src/vault.ts`.
+- `mcp-server/test/task5.test.ts`.
+- `.superpowers/sdd/2026-08-16-codex-to-obsidian/progress.md`.
+
+How the review findings were addressed.
+
+- Passed the logical configured vault root into `readMatchingMarkdownFiles()` so returned relative paths are computed against the configured root instead of the canonical real root.
+- Kept canonical real paths for reading files and containment checks, preserving the symlink/junction safety behavior from the earlier rounds.
+- Tightened server-side error redaction so only the short known safe messages escape, and kept the tool result shapes compatible with the MCP SDK's accepted schema form.
+- Extended the alias-root regression so `find_note` returns `Codex/Conversations/Note.md` exactly, while `open_note` still uses the configured basename behavior from Fix Round 2.
+
+Exact commands run and outputs.
+
+```powershell
+npm run build
+```
+
+Output.
+
+```text
+> codex-to-obsidian-mcp-server@0.1.0 build
+> tsc -p tsconfig.json
+```
+
+```powershell
+npm test
+```
+
+Output.
+
+```text
+1..35
+# tests 35
+# pass 35
+# fail 0
+```
+
+```powershell
+git diff --check
+```
+
+Output.
+
+```text
+warning: in the working copy of 'mcp-server/src/vault.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mcp-server/test/task5.test.ts', LF will be replaced by CRLF the next time Git touches it
+```
+
+Spec compliance verdict.
+
+- Pass for the alias-root `find_note` relative-path regression and the preserved `open_note` alias behavior.
+
+Limitations.
+
+- The CRLF warnings from `git diff --check` remain benign in this Windows workspace.

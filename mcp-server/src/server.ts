@@ -83,30 +83,29 @@ function safeMessage(error: unknown): string {
     error instanceof Error ? error.message : typeof error === "string" ? error : "Unexpected server error";
   const normalized = rawMessage.toLowerCase();
 
-  if (normalized.includes("already exists")) {
+  if (normalized === "already exists") {
     return "already exists";
   }
 
-  if (normalized.includes("codex key does not match")) {
+  if (normalized === "codex key mismatch" || normalized.includes("codex key does not match")) {
     return "codex key mismatch";
   }
 
-  if (normalized.includes("codex key is missing")) {
+  if (normalized === "codex key missing" || normalized.includes("codex key is missing")) {
     return "codex key missing";
   }
 
-  if (normalized.includes("outside configured folder")) {
+  if (normalized === "outside configured folder") {
     return "outside configured folder";
   }
 
   if (
-    normalized.includes("vault root is required in config") ||
+    normalized === "required or invalid config" ||
+    normalized.includes("invalid config") ||
     normalized.includes("relative path is required") ||
     normalized.includes("relative path cannot contain a null byte") ||
     normalized.includes("absolute paths are not allowed") ||
-    normalized.includes("created date is invalid") ||
-    normalized.includes("invalid config") ||
-    normalized.includes("required or invalid config")
+    normalized.includes("created date is invalid")
   ) {
     return "required or invalid config";
   }
@@ -131,14 +130,14 @@ async function loadVaultConfigOrThrow() {
     const vaultStats = await stat(realVaultRoot);
 
     if (!vaultStats.isDirectory()) {
-      throw new Error("Vault root is required in config");
+      throw new Error("required or invalid config");
     }
 
     return {
       ...config,
     };
   } catch {
-    throw new Error("Vault root is required in config");
+    throw new Error("required or invalid config");
   }
 }
 
@@ -220,8 +219,6 @@ export function buildServer(): McpServer {
           isError: true,
           structuredContent: {
             status: "error",
-            matchCount: 0,
-            relativePaths: [],
             message,
           },
         };
