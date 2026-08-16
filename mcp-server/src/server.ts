@@ -83,7 +83,7 @@ function safeMessage(error: unknown): string {
     error instanceof Error ? error.message : typeof error === "string" ? error : "Unexpected server error";
   const normalized = rawMessage.toLowerCase();
 
-  if (normalized === "already exists") {
+  if (normalized === "already exists" || normalized === "note already exists") {
     return "already exists";
   }
 
@@ -95,7 +95,10 @@ function safeMessage(error: unknown): string {
     return "codex key missing";
   }
 
-  if (normalized === "outside configured folder") {
+  if (
+    normalized === "outside configured folder" ||
+    normalized === "path is outside configured folder"
+  ) {
     return "outside configured folder";
   }
 

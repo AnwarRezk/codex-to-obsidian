@@ -119,6 +119,22 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       codex_key: "codex-123",
     });
 
+    const duplicateCreated = (await client.callTool({
+      name: "create_note",
+      arguments: draft,
+    })) as any;
+
+    assert.deepEqual(duplicateCreated.structuredContent, {
+      status: "error",
+      message: "already exists",
+    });
+    assert.equal(
+      duplicateCreated.content[0] && "text" in duplicateCreated.content[0]
+        ? duplicateCreated.content[0].text
+        : "",
+      "status=error message=already exists",
+    );
+
     const found = await client.callTool({
       name: "find_note",
       arguments: { codex_key: "codex-123" },
@@ -146,6 +162,26 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       codex_key: "codex-123",
     });
 
+    const unsafeRelativePathError = (await client.callTool({
+      name: "create_note",
+      arguments: {
+        ...draft,
+        relativePath: "Drafts/Project Notes.md",
+        codex_key: "codex-unsafe",
+      },
+    })) as any;
+
+    assert.deepEqual(unsafeRelativePathError.structuredContent, {
+      status: "error",
+      message: "outside configured folder",
+    });
+    assert.equal(
+      unsafeRelativePathError.content[0] && "text" in unsafeRelativePathError.content[0]
+        ? unsafeRelativePathError.content[0].text
+        : "",
+      "status=error message=outside configured folder",
+    );
+
     const opened = await client.callTool({
       name: "open_note",
       arguments: { relativePath },
@@ -159,10 +195,10 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
 
     process.env.CODEX_OBSIDIAN_VAULT = missingVaultRoot;
 
-    const errorResult = await client.callTool({
+    const errorResult = (await client.callTool({
       name: "get_status",
       arguments: {},
-    });
+    })) as any;
 
     assert.deepEqual(errorResult.structuredContent, {
       status: "error",
@@ -185,10 +221,10 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
     await writeFile(unsafeVaultPath, "not a folder", "utf8");
     process.env.CODEX_OBSIDIAN_VAULT = unsafeVaultPath;
 
-    const unsafeErrorResult = await client.callTool({
+    const unsafeErrorResult = (await client.callTool({
       name: "get_status",
       arguments: {},
-    });
+    })) as any;
 
     assert.deepEqual(unsafeErrorResult.structuredContent, {
       status: "error",
@@ -281,10 +317,10 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
           relativePaths: ["Codex/Conversations/Note.md"],
         });
 
-        const aliasResult = await aliasClient.callTool({
+        const aliasResult = (await aliasClient.callTool({
           name: "open_note",
           arguments: { relativePath: "Codex/Conversations/Note.md" },
-        });
+        })) as any;
 
         assert.equal(aliasResult.structuredContent?.status, "ok");
         assert.equal(
