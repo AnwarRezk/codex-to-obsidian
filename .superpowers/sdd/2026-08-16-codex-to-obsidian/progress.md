@@ -22,3 +22,4 @@ Task 5: complete (Obsidian URI generation and MCP tool registration implemented;
 Task 5: fix round 1/5 (redacted errors, switched wire names to `codex_key`, tightened tool output contracts, pinned `@types/node`, and expanded RPC smoke coverage; build, test, and diff check passed; commit pending).
 Task 5: fix round 2/5 (kept configured vault basenames for URI generation and added alias-root regression coverage; build, test, and diff check passed; commit pending).
 Task 5: fix round 3/5 (returned alias-root lookup paths from the logical configured root while preserving realpath containment; build, test, and diff check passed; commit pending).
+Task 6: complete (save-conversation skill and user docs added; `npm test`, `npm run build`, and `git diff --check` passed, and no practical bundled validator command was available in this workspace).
