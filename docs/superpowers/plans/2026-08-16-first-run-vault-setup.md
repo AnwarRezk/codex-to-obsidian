@@ -179,7 +179,7 @@ Run:
 ```powershell
 npm run build
 Get-ChildItem -LiteralPath .\mcp-server\dist -File | Copy-Item -Destination .\local-marketplace\plugins\codex-to-obsidian\mcp-server\dist -Force
-py -3 C:\Users\arezk\.codex\skills\.system\plugin-creator\scripts\update_plugin_cachebuster.py .
+py -3 <codex-home>\skills\.system\plugin-creator\scripts\update_plugin_cachebuster.py .
 ```
 
 Copy the resulting plugin version into the marketplace snapshot manifest and verify both `.mcp.json` files point to `./mcp-server/dist/standalone.js`.
@@ -196,7 +196,7 @@ git commit -m "feat: add one-time vault setup workflow"
 **Files:**
 - Verify: `mcp-server/`
 - Verify: `%APPDATA%\codex-to-obsidian\config.json`
-- Verify: `C:\Users\arezk\Documents\Codex Obsidian\`
+- Verify: `<user-home>\Documents\Codex Obsidian\`
 
 **Interfaces:**
 - The installed plugin must expose `get_status`, `setup_vault`, `find_note`, `create_note`, `update_note`, and `open_note`.
