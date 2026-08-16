@@ -27,6 +27,15 @@ codex plugin marketplace add C:/path/to/codex-to-obsidian/local-marketplace
 codex plugin add codex-to-obsidian@local-codex
 ```
 
+For a public GitHub marketplace, publish this repository and install it with:
+
+```powershell
+codex plugin marketplace add OWNER/REPOSITORY --ref main --sparse local-marketplace
+codex plugin add codex-to-obsidian@local-codex
+```
+
+The public package includes the compiled `local-marketplace/plugins/codex-to-obsidian/mcp-server/dist` runtime, so users do not need to build the server after installation.
+
 ## Local MCP Setup
 
 Install Node.js before using the local server.
