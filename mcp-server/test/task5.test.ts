@@ -182,6 +182,23 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       "status=error message=outside configured folder",
     );
 
+    for (const invalidRelativePath of ["../Secrets.md", "C:/outside.md", "unsafe\0.md"]) {
+      const invalidPathResult = (await client.callTool({
+        name: "create_note",
+        arguments: {
+          ...draft,
+          relativePath: invalidRelativePath,
+          codex_key: "codex-invalid-path",
+        },
+      })) as any;
+
+      assert.deepEqual(invalidPathResult.structuredContent, {
+        status: "error",
+        message: "outside configured folder",
+      });
+      assert.doesNotMatch(JSON.stringify(invalidPathResult), /Secrets|outside\.md|unsafe/);
+    }
+
     const opened = await client.callTool({
       name: "open_note",
       arguments: { relativePath },

@@ -20,6 +20,7 @@ See the official docs at [Plugins in ChatGPT and Codex](https://help.openai.com/
 ## Local MCP Setup
 
 Install Node.js before using the local server.
+Run `npm install` from `mcp-server` to install the MCP SDK and TypeScript tooling.
 Build the server with `npm run build` from `mcp-server`.
 Codex starts the bundled server with `node ./mcp-server/dist/server.js`.
 The built `mcp-server/dist/server.js` file must exist for the local MCP entry to work.

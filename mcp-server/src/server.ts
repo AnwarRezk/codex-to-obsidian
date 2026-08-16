@@ -97,7 +97,10 @@ function safeMessage(error: unknown): string {
 
   if (
     normalized === "outside configured folder" ||
-    normalized === "path is outside configured folder"
+    normalized === "path is outside configured folder" ||
+    normalized === "path traversal is not allowed" ||
+    normalized === "absolute paths are not allowed" ||
+    normalized === "relative path cannot contain a null byte"
   ) {
     return "outside configured folder";
   }
