@@ -26,9 +26,22 @@ The built `mcp-server/dist/server.js` file must exist for the local MCP entry to
 
 ## Configuration
 
-The plugin reads its vault root from the Codex platform configuration path for this plugin.
-For local testing, set `CODEX_OBSIDIAN_VAULT` to point at a disposable vault.
-Keep the vault writable and make sure it contains a `Codex/Conversations/` folder, or let the plugin create it when the target operation requires it.
+The normal configuration file is `config.json` in the plugin's per-user configuration directory.
+On Windows, use `%APPDATA%\\codex-to-obsidian\\config.json`.
+On macOS, use `~/Library/Application Support/codex-to-obsidian/config.json`.
+On Linux, use `$XDG_CONFIG_HOME/codex-to-obsidian/config.json`, or `~/.config/codex-to-obsidian/config.json` when `XDG_CONFIG_HOME` is unset.
+Create it with a vault root and, optionally, a relative subfolder:
+
+```json
+{
+  "vaultRoot": "C:/Users/you/Documents/MyVault",
+  "relativeSubfolder": "Codex/Conversations"
+}
+```
+
+The default relative subfolder is `Codex/Conversations`.
+For local testing, set `CODEX_OBSIDIAN_VAULT` to a disposable vault root; this override uses the default subfolder when no usable config file is present.
+Keep the vault writable and let the plugin create the configured subfolder when a write requires it.
 
 ## Behavior
 
@@ -48,7 +61,7 @@ If no matching note exists, the default operation is create.
 An explicit `save` always creates a new note.
 An explicit `update` always updates the matching note after confirmation.
 The plugin asks for confirmation immediately before every create or update write.
-The plugin passes only rendered Markdown, title, `codex_key`, and the safe relative path to the MCP server.
+The plugin passes the MCP write fields: title, `codex_key`, safe `relativePath`, creation and update timestamps, summary, decisions, action items, open questions, and an optional source URL.
 The plugin includes a source URL only when Codex has a real URL or the user confirms one.
 If no real source URL exists, the note says `unavailable` instead of inventing a link.
 
@@ -65,7 +78,7 @@ This plugin is local-only in version one.
 It does not add cloud sync, telemetry, deletion, or full-vault search.
 It does not export the full transcript.
 It does not promise Canvas support.
-It does not claim to open Obsidian unless `open_note` confirms the launch.
+The `open_note` tool returns a validated `obsidian://` URI; it does not launch Obsidian or confirm that the app opened.
 Public share links can expose conversation content, so treat any confirmed source URL as sensitive.
 
 ## Troubleshooting

@@ -12,3 +12,10 @@
 - `npm run build` passed.
 - `git diff --check` passed with only the expected Git line-ending warning on `progress.md`.
 - A practical bundled plugin validator command was not available in this workspace, so I did not claim validator success.
+
+## Fix Round 2
+
+- Aligned the skill and README with the actual MCP write schema.
+- Removed unnecessary clarification for the deterministic default operation.
+- Clarified that `open_note` returns a URI and does not confirm an Obsidian launch.
+- Documented the OS-specific config file paths and JSON shape.

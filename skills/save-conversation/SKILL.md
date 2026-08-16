@@ -22,7 +22,7 @@ The default folder is `Codex/Conversations/`.
 ## Workflow
 
 1. Trigger only when the user explicitly asks to save, update, record, or make an Obsidian note.
-2. Ask for missing vault setup or ambiguous save versus update intent instead of guessing.
+2. Ask only when vault setup is missing or matching notes are ambiguous.
 3. Generate one short filesystem-safe title, and preserve that title and relative path on updates.
 4. Write only these five sections in this order.
 5. `# Summary`.
@@ -33,8 +33,9 @@ The default folder is `Codex/Conversations/`.
 10. Include a real source URL only if Codex has one or the user confirms one.
 11. Use `unavailable` when no real source URL exists.
 12. Ask for confirmation immediately before any create or update write, and include the target path and operation.
-13. Pass rendered Markdown, title, `codex_key`, and the safe relative path to the MCP tool.
-14. Use `find_note`, `create_note`, `update_note`, `get_status`, and `open_note` as needed.
+13. Pass the MCP write schema: `title`, `codex_key`, `relativePath`, `created`, `updated`, `summary`, `decisions`, `actionItems`, `openQuestions`, and optional `sourceUrl`.
+14. Use `find_note`, `create_note`, `update_note`, and `get_status` as needed.
+15. Use `open_note` only to obtain a validated Obsidian URI, and never claim that it opened the app.
 
 ## Example
 
@@ -48,4 +49,4 @@ You: I will summarize it into `Codex/Conversations/` and confirm the target path
 - Changing the title or path during an update.
 - Inventing a source link.
 - Writing before confirmation.
-- Claiming Obsidian opened unless `open_note` confirms it.
+- Claiming Obsidian opened after receiving only a URI.
