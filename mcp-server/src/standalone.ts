@@ -182,6 +182,10 @@ async function loadVaultConfigOrThrow(): Promise<VaultConfig> {
     if (!vaultStats.isDirectory()) throw new Error("required or invalid config");
     return config;
   } catch (error) {
+    if (error instanceof Error && error.message === "setup required") {
+      throw error;
+    }
+
     const code = error as NodeJS.ErrnoException;
     if (code.code === "EACCES" || code.code === "EPERM") {
       throw new Error("permission denied");
