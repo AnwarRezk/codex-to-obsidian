@@ -178,6 +178,10 @@ async function loadVaultConfigOrThrow() {
       ...config,
     };
   } catch (error) {
+    if (error instanceof Error && error.message === "setup required") {
+      throw error;
+    }
+
     const code = error as NodeJS.ErrnoException;
     if (code.code === "EACCES" || code.code === "EPERM") {
       throw new Error("permission denied");
