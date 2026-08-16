@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url";
+import { realpath, stat } from "node:fs/promises";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -14,7 +15,7 @@ const relativePathSchema = z.string().trim().min(1);
 
 const notePayloadSchema = z.object({
   title: z.string().trim().min(1),
-  codexKey: z.string().trim().min(1),
+  codex_key: z.string().trim().min(1),
   relativePath: relativePathSchema,
   created: z.string().trim().min(1),
   updated: z.string().trim().min(1),
@@ -27,37 +28,46 @@ const notePayloadSchema = z.object({
 
 type NotePayload = z.infer<typeof notePayloadSchema>;
 
-const statusResultSchema = z.object({
-  status: z.string(),
-  relativeSubfolder: z.string().optional(),
-  message: z.string().optional(),
-});
+const statusResultSchema = z
+  .object({
+    status: z.enum(["ready", "error"]),
+    relativeSubfolder: z.string().optional(),
+    message: z.string().optional(),
+  })
+  .strict();
 
-const findResultSchema = z.object({
-  status: z.string(),
-  matchCount: z.number(),
-  relativePaths: z.array(z.string()),
-  message: z.string().optional(),
-});
+const findResultSchema = z
+  .object({
+    status: z.enum(["not_found", "found", "ambiguous", "error"]),
+    codex_key: z.string().optional(),
+    matchCount: z.number().int().nonnegative().optional(),
+    relativePaths: z.array(z.string()).optional(),
+    message: z.string().optional(),
+  })
+  .strict();
 
-const writeResultSchema = z.object({
-  status: z.string(),
-  relativePath: z.string(),
-  codexKey: z.string(),
-  message: z.string().optional(),
-});
+const writeResultSchema = z
+  .object({
+    status: z.enum(["created", "updated", "error"]),
+    relativePath: z.string().optional(),
+    codex_key: z.string().optional(),
+    message: z.string().optional(),
+  })
+  .strict();
 
-const openResultSchema = z.object({
-  status: z.string(),
-  relativePath: z.string(),
-  uri: z.string(),
-  message: z.string().optional(),
-});
+const openResultSchema = z
+  .object({
+    status: z.enum(["ok", "error"]),
+    relativePath: z.string().optional(),
+    uri: z.string().optional(),
+    message: z.string().optional(),
+  })
+  .strict();
 
 function toDraft(payload: NotePayload) {
   return {
     title: payload.title,
-    codexKey: payload.codexKey,
+    codexKey: payload.codex_key,
     created: payload.created,
     updated: payload.updated,
     summary: payload.summary,
@@ -71,8 +81,37 @@ function toDraft(payload: NotePayload) {
 function safeMessage(error: unknown): string {
   const rawMessage =
     error instanceof Error ? error.message : typeof error === "string" ? error : "Unexpected server error";
+  const normalized = rawMessage.toLowerCase();
 
-  return rawMessage.replace(/\s+/g, " ").trim().slice(0, 240) || "Unexpected server error";
+  if (normalized.includes("already exists")) {
+    return "already exists";
+  }
+
+  if (normalized.includes("codex key does not match")) {
+    return "codex key mismatch";
+  }
+
+  if (normalized.includes("codex key is missing")) {
+    return "codex key missing";
+  }
+
+  if (normalized.includes("outside configured folder")) {
+    return "outside configured folder";
+  }
+
+  if (
+    normalized.includes("vault root is required in config") ||
+    normalized.includes("relative path is required") ||
+    normalized.includes("relative path cannot contain a null byte") ||
+    normalized.includes("absolute paths are not allowed") ||
+    normalized.includes("created date is invalid") ||
+    normalized.includes("invalid config") ||
+    normalized.includes("required or invalid config")
+  ) {
+    return "required or invalid config";
+  }
+
+  return "Unexpected server error";
 }
 
 function textResult(
@@ -86,9 +125,22 @@ function textResult(
 }
 
 async function loadVaultConfigOrThrow() {
-  const config = await loadConfig();
+  try {
+    const config = await loadConfig();
+    const realVaultRoot = await realpath(config.vaultRoot);
+    const vaultStats = await stat(realVaultRoot);
 
-  return config;
+    if (!vaultStats.isDirectory()) {
+      throw new Error("Vault root is required in config");
+    }
+
+    return {
+      ...config,
+      vaultRoot: realVaultRoot,
+    };
+  } catch {
+    throw new Error("Vault root is required in config");
+  }
 }
 
 export function buildServer(): McpServer {
@@ -136,15 +188,15 @@ export function buildServer(): McpServer {
     {
       description: "Find notes by codex_key inside the configured conversations folder",
       inputSchema: z.object({
-        codexKey: z.string().trim().min(1),
+        codex_key: z.string().trim().min(1),
       }),
       annotations: { readOnlyHint: true, idempotentHint: true },
       outputSchema: findResultSchema,
     },
-    async ({ codexKey }): Promise<CallToolResult> => {
+    async ({ codex_key }): Promise<CallToolResult> => {
       try {
         const config = await loadVaultConfigOrThrow();
-        const relativePaths = await findNote(config, codexKey);
+        const relativePaths = await findNote(config, codex_key);
         const status =
           relativePaths.length === 0
             ? "not_found"
@@ -156,6 +208,7 @@ export function buildServer(): McpServer {
           `status=${status} matchCount=${relativePaths.length}`,
           {
             status,
+            codex_key,
             matchCount: relativePaths.length,
             relativePaths,
           },
@@ -193,7 +246,7 @@ export function buildServer(): McpServer {
         return textResult(`status=created relativePath=${result.relativePath}`, {
           status: "created",
           relativePath: result.relativePath,
-          codexKey: result.codexKey,
+          codex_key: result.codexKey,
         });
       } catch (error) {
         const message = safeMessage(error);
@@ -226,7 +279,7 @@ export function buildServer(): McpServer {
         return textResult(`status=updated relativePath=${result.relativePath}`, {
           status: "updated",
           relativePath: result.relativePath,
-          codexKey: result.codexKey,
+          codex_key: result.codexKey,
         });
       } catch (error) {
         const message = safeMessage(error);
