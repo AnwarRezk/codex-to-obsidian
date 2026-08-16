@@ -26,3 +26,4 @@ Task 6: complete (save-conversation skill and user docs added; `npm test`, `npm 
 Task 6: fix round 1/5 (scoped review found MCP schema, default-operation, open-note, and config-documentation mismatches).
 Task 6: fix round 2/5 (aligned docs with actual MCP inputs and behavior, documented config paths, and clarified URI-only open behavior; pending scoped re-review).
 Task 7: verification found and fixed unsafe-path error redaction; build and 35-test suite pass, disposable-vault smoke coverage pass, validator remains blocked by missing PyYAML, and packaging remains to be completed.
+Task 7: complete (unsafe-path redaction regression covered, build and 35 tests pass, disposable-vault smoke checks pass, archive hygiene verified, and release archive created under outputs; validator remains blocked by missing PyYAML and its known schema mismatch).
