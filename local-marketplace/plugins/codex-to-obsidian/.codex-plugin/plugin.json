@@ -13,11 +13,7 @@
     "longDescription": "Save concise Codex conversation summaries as safe, updateable Markdown notes in a local Obsidian vault.",
     "developerName": "Local developer",
     "category": "Productivity",
-    "capabilities": [
-      "Write"
-    ],
-    "defaultPrompt": [
-      "Save this conversation to Obsidian."
-    ]
+    "capabilities": ["Write"],
+    "defaultPrompt": ["Save this conversation to Obsidian."]
   }
 }
