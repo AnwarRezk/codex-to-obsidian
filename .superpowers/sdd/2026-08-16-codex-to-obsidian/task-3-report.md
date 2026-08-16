@@ -64,3 +64,40 @@ Limitations.
 
 - The local workspace does not have `tsx` or `tsc` installed, so the package scripts could not run here.
 - I verified the note logic with a single-process Node smoke check instead.
+
+## Fix Round 1
+
+Files changed.
+
+- `mcp-server/src/notes.ts`.
+- `mcp-server/test/notes.test.ts`.
+- `.superpowers/sdd/2026-08-16-codex-to-obsidian/task-3-report.md`.
+
+How the review findings were addressed.
+
+- Added a deterministic Windows reserved-device guard in filename sanitization so reserved names now get a safe `note-...-note` wrapper.
+- Preserved caller-supplied `YYYY-MM-DD` prefixes from ISO-like timestamps before falling back to UTC parsing, which avoids calendar-day shifts for timezone-offset inputs.
+- Normalized `sourceUrl` before rendering so undefined, empty, and whitespace-only values all behave as unavailable and omit `source_url` frontmatter.
+- Corrected the Markdown-link expectation in the escaping test to match the intentional escaped target output.
+
+Exact commands run and outputs.
+
+```powershell
+node --experimental-strip-types --input-type=module -e 'import assert from "node:assert/strict"; import { buildFilename, renderNote, selectOperation } from "./src/notes.ts"; const amp = String.fromCharCode(38); const source = `https://example.test/share/a(b)c?x=1${amp}y=2`; assert.equal(renderNote({ title: "Project planning", codexKey: "abc-123", created: "2026-08-16", updated: "2026-08-16", summary: "Summary.", decisions: [], actionItems: [], openQuestions: [], sourceUrl: "   " }), ["---", "title: \\"Project planning\\"", "codex_key: \\"abc-123\\"", "created: \\"2026-08-16\\"", "updated: \\"2026-08-16\\"", "---", "# Summary", "Summary.", "", "## Decisions", "None", "", "## Action items", "None", "", "## Open questions", "None", "", "## Source conversation", "Source conversation: unavailable"].join("\\n")); assert.equal(renderNote({ title: "Project: \\"Launch\\" / phase (1)", codexKey: "abc-123", created: "2026-08-16", updated: "2026-08-16", summary: "Summary.", decisions: [], actionItems: [], openQuestions: [], sourceUrl: source }), ["---", "title: \\"Project: \\\\\\"Launch\\\\\\" / phase (1)\\"", "codex_key: \\"abc-123\\"", "created: \\"2026-08-16\\"", "updated: \\"2026-08-16\\"", `source_url: ${JSON.stringify(source.trim())}`, "---", "# Summary", "Summary.", "", "## Decisions", "None", "", "## Action items", "None", "", "## Open questions", "None", "", "## Source conversation", `[Open the original Codex conversation](https://example.test/share/a\\\\(b\\\\)c?x=1${amp}y=2)`].join("\\n")); assert.equal(buildFilename("2026-08-16T23:30:00-02:00", "Weekly sync"), "2026-08-16 - Weekly sync.md"); assert.equal(buildFilename("2026-08-16", "CON"), "2026-08-16 - note-CON-note.md"); assert.equal(selectOperation({ operation: "save", matchingNoteExists: true }), "create"); assert.equal(selectOperation({ matchingNoteExists: true }), "update"); console.log("Task 3 fix round 1 smoke check passed");'
+```
+
+Output.
+
+```text
+Task 3 fix round 1 smoke check passed
+```
+
+```powershell
+git diff --check
+```
+
+Output.
+
+```text
+warning: in the working copy of '.superpowers/sdd/2026-08-16-codex-to-obsidian/progress.md', LF will be replaced by CRLF the next time Git touches it
+```

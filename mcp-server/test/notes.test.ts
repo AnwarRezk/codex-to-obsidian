@@ -87,6 +87,46 @@ test("renderNote uses an unavailable source placeholder", () => {
   );
 });
 
+test("renderNote treats whitespace sourceUrl as unavailable and omits frontmatter", () => {
+  const note = renderNote({
+    title: "Project planning",
+    codexKey: "abc-123",
+    created: "2026-08-16",
+    updated: "2026-08-16",
+    summary: "Summary.",
+    decisions: [],
+    actionItems: [],
+    openQuestions: [],
+    sourceUrl: "   ",
+  });
+
+  assert.equal(
+    note,
+    [
+      "---",
+      'title: "Project planning"',
+      'codex_key: "abc-123"',
+      'created: "2026-08-16"',
+      'updated: "2026-08-16"',
+      "---",
+      "# Summary",
+      "Summary.",
+      "",
+      "## Decisions",
+      "None",
+      "",
+      "## Action items",
+      "None",
+      "",
+      "## Open questions",
+      "None",
+      "",
+      "## Source conversation",
+      "Source conversation: unavailable",
+    ].join("\n"),
+  );
+});
+
 test("renderNote escapes YAML and Markdown link values", () => {
   const note = renderNote({
     title: 'Project: "Launch" / phase (1)',
@@ -123,7 +163,7 @@ test("renderNote escapes YAML and Markdown link values", () => {
       "None",
       "",
       "## Source conversation",
-      "[Open the original Codex conversation](https://example.test/share/a(b)c?x=1&y=2)",
+      "[Open the original Codex conversation](https://example.test/share/a\\(b\\)c?x=1&y=2)",
     ].join("\n"),
   );
 });
@@ -135,11 +175,25 @@ test("buildFilename produces a filesystem-safe note filename", () => {
   );
 });
 
+test("buildFilename preserves the caller-supplied date prefix from a timezone offset", () => {
+  assert.equal(
+    buildFilename("2026-08-16T23:30:00-02:00", "Weekly sync"),
+    "2026-08-16 - Weekly sync.md",
+  );
+});
+
 test("buildFilename stays stable for the same created date and title", () => {
   assert.equal(buildFilename("2026-08-16", "Weekly sync"), "2026-08-16 - Weekly sync.md");
   assert.equal(
     buildFilename("2026-08-16T23:59:59Z", "Weekly sync"),
     "2026-08-16 - Weekly sync.md",
+  );
+});
+
+test("buildFilename guards Windows reserved device names", () => {
+  assert.equal(
+    buildFilename("2026-08-16", "CON"),
+    "2026-08-16 - note-CON-note.md",
   );
 });
 
