@@ -1,6 +1,6 @@
 {
   "name": "codex-to-obsidian",
-  "version": "0.1.0+codex.20260816171623",
+  "version": "0.1.0+codex.20260816145946",
   "description": "Save Codex conversation summaries as safe, updateable Markdown notes in Obsidian.",
   "author": {
     "name": "Local developer"
@@ -16,6 +16,8 @@
     "capabilities": [
       "Write"
     ],
+    "composerIcon": "./.codex-plugin/assets/obsidian-logo.svg",
+    "logo": "./.codex-plugin/assets/obsidian-logo.svg",
     "defaultPrompt": [
       "Save this conversation to Obsidian."
     ]

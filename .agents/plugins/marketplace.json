@@ -1,0 +1,20 @@
+{
+  "name": "codex-to-obsidian",
+  "interface": {
+    "displayName": "Codex to Obsidian"
+  },
+  "plugins": [
+    {
+      "name": "codex-to-obsidian",
+      "source": {
+        "source": "local",
+        "path": "./local-marketplace/plugins/codex-to-obsidian"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
