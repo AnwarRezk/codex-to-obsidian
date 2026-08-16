@@ -16,3 +16,4 @@ Task 3: complete (commits 412333a..db2695f, note renderer and operation policy r
 Task 2: complete (config and path safety implemented, with local smoke verification passed and package-local test/build tooling unavailable in this workspace).
 Task 3: complete (note rendering and operation policy implemented; local smoke verification passed; package-local tsx/tsc remain unavailable in this workspace).
 Task 4: complete (safe vault operations implemented; bounded Node smoke verification passed; package-local tsx/tsc remain unavailable in this workspace).
+Task 4: fix round 1/5 (added realpath containment, multiple-match coverage, and symlink/junction regression; bounded Node smoke and diff checks passed; commit pending).

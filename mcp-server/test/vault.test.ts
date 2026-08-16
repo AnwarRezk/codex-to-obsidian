@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -45,6 +45,49 @@ function toRelativePath(draft: NoteDraft): string {
     buildFilename(draft.created, draft.title),
   );
 }
+
+function isPrivilegeError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code !== undefined &&
+    ["EPERM", "EACCES"].includes((error as { code?: string }).code ?? "")
+  );
+}
+
+async function probeSymlinkSupport(): Promise<{
+  supported: boolean;
+  skipReason?: string;
+}> {
+  if (process.platform !== "win32") {
+    return { supported: true };
+  }
+
+  const probeRoot = await mkdtemp(path.join(os.tmpdir(), "codex-symlink-"));
+  const targetPath = path.join(probeRoot, "target");
+  const linkPath = path.join(probeRoot, "link");
+
+  try {
+    await mkdir(targetPath, { recursive: true });
+    await symlink(targetPath, linkPath, "junction");
+    return { supported: true };
+  } catch (error) {
+    if (isPrivilegeError(error)) {
+      return {
+        supported: false,
+        skipReason:
+          "Windows symlink/junction creation requires privileges in this environment.",
+      };
+    }
+
+    throw error;
+  } finally {
+    await rm(probeRoot, { recursive: true, force: true });
+  }
+}
+
+const symlinkSupport = await probeSymlinkSupport();
 
 test("create writes a new note under the configured folder", async () => {
   await withTempVault(async (config) => {
@@ -101,6 +144,35 @@ test("findNote returns matches only from the configured folder", async () => {
     );
 
     assert.deepEqual(await findNote(config, draft.codexKey), [relativePath]);
+  });
+});
+
+test("findNote returns multiple matching paths for the same codex key", async () => {
+  await withTempVault(async (config) => {
+    const firstDraft = makeDraft({
+      title: "Project alpha",
+      codexKey: "shared-codex-key",
+      created: "2026-08-16T10:00:00Z",
+    });
+    const secondDraft = makeDraft({
+      title: "Project beta",
+      codexKey: "shared-codex-key",
+      created: "2026-08-16T11:00:00Z",
+    });
+    const firstPath = toRelativePath(firstDraft);
+    const secondPath = path.posix.join(
+      DEFAULT_SUBFOLDER,
+      "Nested",
+      buildFilename(secondDraft.created, secondDraft.title),
+    );
+
+    await createNote(config, firstPath, firstDraft);
+    await createNote(config, secondPath, secondDraft);
+
+    assert.deepEqual(await findNote(config, firstDraft.codexKey), [
+      firstPath,
+      secondPath,
+    ]);
   });
 });
 
@@ -168,3 +240,50 @@ test("update refuses a mismatched codex key without changing the source note", a
     );
   });
 });
+
+test(
+  "create rejects a symlinked parent directory that escapes the configured vault",
+  {
+    skip: symlinkSupport.supported ? false : symlinkSupport.skipReason,
+  },
+  async () => {
+    await withTempVault(async (config) => {
+      const escapeRoot = await mkdtemp(path.join(os.tmpdir(), "codex-escape-"));
+      const linkedDirectory = path.join(
+        config.vaultRoot,
+        "Codex",
+        "Conversations",
+        "Linked",
+      );
+      const draft = makeDraft({
+        title: "Linked escape",
+        created: "2026-08-16T12:00:00Z",
+      });
+      const relativePath = path.posix.join(
+        DEFAULT_SUBFOLDER,
+        "Linked",
+        buildFilename(draft.created, draft.title),
+      );
+
+      try {
+        await mkdir(escapeRoot, { recursive: true });
+        await symlink(escapeRoot, linkedDirectory, "junction");
+
+        await assert.rejects(
+          () => createNote(config, relativePath, draft),
+          /outside configured folder/i,
+        );
+        await assert.rejects(
+          readFile(path.join(escapeRoot, path.basename(relativePath)), "utf8"),
+          (error: unknown) =>
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            (error as { code?: string }).code === "ENOENT",
+        );
+      } finally {
+        await rm(escapeRoot, { recursive: true, force: true });
+      }
+    });
+  },
+);

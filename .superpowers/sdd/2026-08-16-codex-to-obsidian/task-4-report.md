@@ -80,3 +80,66 @@ Limitations.
 - The workspace does not have `tsx` or `tsc`, so the requested package scripts could not run here.
 - Node's built-in test runner could not be used as a direct substitute in this harness because child-process spawning returned `EPERM`.
 - I verified the vault logic with a bounded Node strip-types smoke check instead of installing dependencies.
+
+## Fix Round 1
+
+Files changed.
+
+- `mcp-server/src/vault.ts`.
+- `mcp-server/test/vault.test.ts`.
+- `.superpowers/sdd/2026-08-16-codex-to-obsidian/progress.md`.
+- `.superpowers/sdd/2026-08-16-codex-to-obsidian/task-4-report.md`.
+
+How the review findings were addressed.
+
+- Added real filesystem containment checks with `fs.realpath()` and a nearest-existing-ancestor helper so create, find, and update reject symlink and junction redirection outside the configured vault area.
+- Kept the lexical `resolveVaultPath()` checks in place and added the pre-create ancestor check so a redirected parent cannot be followed by `mkdir()` before rejection.
+- Added a disposable-vault regression test that proves `findNote()` returns multiple relative matches for the same `codex_key`.
+- Added a symlink and junction escape regression test that skips only when Windows privileges prevent symlink creation, with an explicit platform reason.
+- Preserved the existing no-overwrite and atomic update behavior.
+
+Exact commands run and outputs.
+
+```powershell
+git diff --check
+```
+
+Output.
+
+```text
+warning: in the working copy of 'mcp-server/src/vault.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mcp-server/test/vault.test.ts', LF will be replaced by CRLF the next time Git touches it
+```
+
+```powershell
+node --experimental-strip-types --input-type=module -e "import fs from 'node:fs/promises'; import os from 'node:os'; import path from 'node:path'; import { pathToFileURL } from 'node:url'; const repo = 'C:/Users/arezk/Documents/Codex/2026-08-16/openai-s-current-harness-guidance-3/work/codex-to-obsidian/mcp-server/src'; const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-vault-fix1-')); for (const name of ['config.ts','paths.ts','notes.ts','vault.ts']) { const source = await fs.readFile(path.join(repo, name), 'utf8'); const patched = source.replaceAll('./config.js', './config.ts').replaceAll('./paths.js', './paths.ts').replaceAll('./notes.js', './notes.ts'); await fs.writeFile(path.join(tempRoot, name), patched, 'utf8'); } const vault = await import(pathToFileURL(path.join(tempRoot, 'vault.ts')).href); const notes = await import(pathToFileURL(path.join(tempRoot, 'notes.ts')).href); const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-vault-data-')); const config = { vaultRoot, relativeSubfolder: 'Codex/Conversations' }; await fs.mkdir(path.join(vaultRoot, 'Codex', 'Conversations', 'Nested'), { recursive: true }); const sharedKey = 'shared-codex-key'; const firstDraft = { title: 'Project alpha', codexKey: sharedKey, created: '2026-08-16T10:00:00Z', updated: '2026-08-16T10:30:00Z', summary: 'Alpha.', decisions: ['One'], actionItems: ['Two'], openQuestions: ['Three'] }; const secondDraft = { title: 'Project beta', codexKey: sharedKey, created: '2026-08-16T11:00:00Z', updated: '2026-08-16T11:30:00Z', summary: 'Beta.', decisions: ['One'], actionItems: ['Two'], openQuestions: ['Three'] }; const firstPath = path.posix.join('Codex/Conversations', notes.buildFilename(firstDraft.created, firstDraft.title)); const secondPath = path.posix.join('Codex/Conversations', 'Nested', notes.buildFilename(secondDraft.created, secondDraft.title)); const created1 = await vault.createNote(config, firstPath, firstDraft); const created2 = await vault.createNote(config, secondPath, secondDraft); const matches = await vault.findNote(config, sharedKey); const originalNote = { title: 'Project planning', codexKey: 'codex-123', created: '2026-08-16T10:00:00Z', updated: '2026-08-16T10:30:00Z', summary: 'Keep scope small.', decisions: ['Ship the smallest safe flow.'], actionItems: ['Verify create and update.'], openQuestions: ['Do we need more later?'] }; const originalPath = path.posix.join('Codex/Conversations', notes.buildFilename(originalNote.created, originalNote.title)); await vault.createNote(config, originalPath, originalNote); let collisionMessage = 'no-error'; try { await vault.createNote(config, originalPath, originalNote); } catch (error) { collisionMessage = error instanceof Error ? error.message : String(error); } const updatedDraft = { ...originalNote, updated: '2026-08-17T09:15:00Z', summary: 'Keep the vault flow tiny.' }; const updated = await vault.updateNote(config, originalPath, updatedDraft); const updatedContents = await fs.readFile(path.join(vaultRoot, originalPath.replaceAll('/', path.sep)), 'utf8'); let mismatchMessage = 'no-error'; try { await vault.updateNote(config, originalPath, { ...originalNote, codexKey: 'different-codex-key', updated: '2026-08-17T09:15:00Z', summary: 'This must not be written.' }); } catch (error) { mismatchMessage = error instanceof Error ? error.message : String(error); } const escapeRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-escape-')); const linkedDirectory = path.join(vaultRoot, 'Codex', 'Conversations', 'Linked'); const escapeDraft = { title: 'Linked escape', codexKey: 'escape-key', created: '2026-08-16T12:00:00Z', updated: '2026-08-16T12:30:00Z', summary: 'Escape.', decisions: ['One'], actionItems: ['Two'], openQuestions: ['Three'] }; const escapePath = path.posix.join('Codex/Conversations', 'Linked', notes.buildFilename(escapeDraft.created, escapeDraft.title)); let skipReason = null; let escapeMessage = 'no-error'; try { await fs.symlink(escapeRoot, linkedDirectory, 'junction'); await vault.createNote(config, escapePath, escapeDraft); } catch (error) { if (process.platform === 'win32' && (error?.code === 'EPERM' || error?.code === 'EACCES')) { skipReason = 'Windows symlink/junction creation requires privileges in this environment.'; } else { escapeMessage = error instanceof Error ? error.message : String(error); } } const escapeFile = path.join(escapeRoot, path.basename(escapePath)); let escapeFileMissing = true; try { await fs.access(escapeFile); escapeFileMissing = false; } catch {} await fs.rm(escapeRoot, { recursive: true, force: true }); console.log(JSON.stringify({ created1, created2, matchCount: matches.length, matches, collisionMessage, updatedCreatedPreserved: updatedContents.includes('created:') && updatedContents.includes('2026-08-16T10:00:00Z'), updatedSummary: updatedContents.includes('Keep the vault flow tiny.'), mismatchMessage, escapeMessage, skipReason, escapeFileMissing }, null, 2));"
+```
+
+Output.
+
+```json
+{
+  "created1": {
+    "relativePath": "Codex/Conversations/2026-08-16 - Project alpha.md",
+    "absolutePath": "C:\\Users\\arezk\\AppData\\Local\\Temp\\codex-vault-data-H2yBSG\\Codex\\Conversations\\2026-08-16 - Project alpha.md",
+    "codexKey": "shared-codex-key"
+  },
+  "created2": {
+    "relativePath": "Codex/Conversations/Nested/2026-08-16 - Project beta.md",
+    "absolutePath": "C:\\Users\\arezk\\AppData\\Local\\Temp\\codex-vault-data-H2yBSG\\Codex\\Conversations\\Nested\\2026-08-16 - Project beta.md",
+    "codexKey": "shared-codex-key"
+  },
+  "matchCount": 2,
+  "matches": [
+    "Codex/Conversations/2026-08-16 - Project alpha.md",
+    "Codex/Conversations/Nested/2026-08-16 - Project beta.md"
+  ],
+  "collisionMessage": "Note already exists",
+  "updatedCreatedPreserved": true,
+  "updatedSummary": true,
+  "mismatchMessage": "Note codex key does not match",
+  "escapeMessage": "Path is outside configured folder",
+  "skipReason": null,
+  "escapeFileMissing": true
+}
+```

@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 
 import type { VaultConfig } from "./config.js";
@@ -10,6 +17,102 @@ export interface VaultWriteResult {
   relativePath: string;
   absolutePath: string;
   codexKey: string;
+}
+
+function isContainedWithin(basePath: string, candidatePath: string): boolean {
+  const normalizedBase = path.resolve(basePath);
+  const normalizedCandidate = path.resolve(candidatePath);
+  const relativePath =
+    process.platform === "win32"
+      ? path.win32.relative(
+          normalizedBase.toLowerCase(),
+          normalizedCandidate.toLowerCase(),
+        )
+      : path.relative(normalizedBase, normalizedCandidate);
+
+  return (
+    relativePath === "" ||
+    (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
+  );
+}
+
+function assertContainedWithin(basePath: string, candidatePath: string): void {
+  if (!isContainedWithin(basePath, candidatePath)) {
+    throw new Error("Path is outside configured folder");
+  }
+}
+
+async function nearestExistingAncestor(candidatePath: string): Promise<string> {
+  let currentPath = path.resolve(candidatePath);
+
+  while (true) {
+    try {
+      await realpath(currentPath);
+      return currentPath;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+
+      const parentPath = path.dirname(currentPath);
+
+      if (parentPath === currentPath) {
+        return currentPath;
+      }
+
+      currentPath = parentPath;
+    }
+  }
+}
+
+async function loadVaultContainment(config: VaultConfig): Promise<{
+  realVaultRoot: string;
+  configuredFolderPath: string;
+  realConfiguredFolderReference: string;
+}> {
+  const realVaultRoot = await realpath(path.resolve(config.vaultRoot));
+  const configuredFolderPath = resolveVaultPath(
+    config,
+    config.relativeSubfolder,
+  ).absolutePath;
+  const nearestAncestor = await nearestExistingAncestor(configuredFolderPath);
+  const realConfiguredFolderReference = await realpath(nearestAncestor);
+
+  assertContainedWithin(realVaultRoot, realConfiguredFolderReference);
+
+  return {
+    realVaultRoot,
+    configuredFolderPath,
+    realConfiguredFolderReference,
+  };
+}
+
+async function assertTargetContained(
+  config: VaultConfig,
+  targetPath: string,
+): Promise<void> {
+  const { realVaultRoot, configuredFolderPath } = await loadVaultContainment(
+    config,
+  );
+  const realConfiguredFolder = await realpath(configuredFolderPath);
+  const nearestAncestor = await nearestExistingAncestor(targetPath);
+  const realNearestAncestor = await realpath(nearestAncestor);
+
+  assertContainedWithin(realVaultRoot, realConfiguredFolder);
+  assertContainedWithin(realConfiguredFolder, realNearestAncestor);
+}
+
+async function assertPotentialTargetContained(
+  config: VaultConfig,
+  targetPath: string,
+): Promise<void> {
+  const { realVaultRoot, realConfiguredFolderReference } =
+    await loadVaultContainment(config);
+  const nearestAncestor = await nearestExistingAncestor(targetPath);
+  const realNearestAncestor = await realpath(nearestAncestor);
+
+  assertContainedWithin(realVaultRoot, realConfiguredFolderReference);
+  assertContainedWithin(realConfiguredFolderReference, realNearestAncestor);
 }
 
 async function readFrontmatterValue(
@@ -69,11 +172,33 @@ async function readMatchingMarkdownFiles(
   directory: string,
   vaultRoot: string,
   codexKey: string,
+  realConfiguredFolder: string,
+  visitedDirectories = new Set<string>(),
 ): Promise<string[]> {
+  let realDirectory: string;
+
+  try {
+    realDirectory = await realpath(directory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
+  }
+
+  assertContainedWithin(realConfiguredFolder, realDirectory);
+
+  if (visitedDirectories.has(realDirectory)) {
+    return [];
+  }
+
+  visitedDirectories.add(realDirectory);
+
   let directoryEntries;
 
   try {
-    directoryEntries = await readdir(directory, { withFileTypes: true });
+    directoryEntries = await readdir(realDirectory, { withFileTypes: true });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return [];
@@ -85,14 +210,29 @@ async function readMatchingMarkdownFiles(
   const matches: string[] = [];
 
   for (const entry of directoryEntries) {
-    const absolutePath = path.join(directory, entry.name);
+    const absolutePath = path.join(realDirectory, entry.name);
+    let realEntryPath: string;
+
+    try {
+      realEntryPath = await realpath(absolutePath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        continue;
+      }
+
+      throw error;
+    }
+
+    assertContainedWithin(realConfiguredFolder, realEntryPath);
 
     if (entry.isDirectory()) {
       matches.push(
         ...(await readMatchingMarkdownFiles(
-          absolutePath,
+          realEntryPath,
           vaultRoot,
           codexKey,
+          realConfiguredFolder,
+          visitedDirectories,
         )),
       );
       continue;
@@ -102,11 +242,11 @@ async function readMatchingMarkdownFiles(
       continue;
     }
 
-    const contents = await readFile(absolutePath, "utf8");
+    const contents = await readFile(realEntryPath, "utf8");
     const noteCodexKey = await readFrontmatterValue(contents, "codex_key");
 
     if (noteCodexKey === codexKey) {
-      matches.push(toVaultRelativePath(vaultRoot, absolutePath));
+      matches.push(toVaultRelativePath(vaultRoot, realEntryPath));
     }
   }
 
@@ -117,11 +257,15 @@ export async function findNote(
   config: VaultConfig,
   codexKey: string,
 ): Promise<string[]> {
+  const { realVaultRoot, configuredFolderPath } = await loadVaultContainment(
+    config,
+  );
   const vaultFolder = getVaultFolder(config);
   const matches = await readMatchingMarkdownFiles(
     vaultFolder,
-    config.vaultRoot,
+    realVaultRoot,
     codexKey,
+    configuredFolderPath,
   );
 
   return matches.sort((left, right) => left.localeCompare(right));
@@ -135,7 +279,9 @@ export async function createNote(
   const resolvedPath = resolveVaultPath(config, relativePath);
   const nextContents = renderNote(draft);
 
+  await assertPotentialTargetContained(config, path.dirname(resolvedPath.absolutePath));
   await mkdir(path.dirname(resolvedPath.absolutePath), { recursive: true });
+  await assertTargetContained(config, path.dirname(resolvedPath.absolutePath));
 
   try {
     await writeFile(resolvedPath.absolutePath, nextContents, {
@@ -163,6 +309,7 @@ export async function updateNote(
   draft: NoteDraft,
 ): Promise<VaultWriteResult> {
   const resolvedPath = resolveVaultPath(config, relativePath);
+  await assertTargetContained(config, resolvedPath.absolutePath);
   const existingContents = await readFile(resolvedPath.absolutePath, "utf8");
   const existingCodexKey = await readFrontmatterValue(
     existingContents,
