@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
   DEFAULT_SUBFOLDER,
+  ensureVaultRoot,
   loadConfig,
   saveConfig,
   type VaultConfig,
@@ -188,8 +189,45 @@ test("default configured folder is Codex/Conversations", async () => {
 
         assert.equal(config.vaultRoot, "C:\\vault");
         assert.equal(config.relativeSubfolder, DEFAULT_SUBFOLDER);
+        assert.equal(config.setupRequired, false);
       },
     );
+  });
+});
+
+test("missing config defaults to the persistent Codex Obsidian vault", async () => {
+  await withTempConfigHome(async (configHome) => {
+    const envPatch = getPlatformEnvPatch(configHome);
+
+    await withEnv(
+      { ...envPatch, CODEX_OBSIDIAN_VAULT: undefined },
+      async () => {
+        const config = await loadConfig();
+
+        assert.equal(
+          config.vaultRoot,
+          path.resolve(os.homedir(), "Documents", "Codex Obsidian"),
+        );
+        assert.equal(config.relativeSubfolder, DEFAULT_SUBFOLDER);
+        assert.equal(config.setupRequired, true);
+      },
+    );
+  });
+});
+
+test("ensureVaultRoot creates an Obsidian vault marker", async () => {
+  await withTempConfigHome(async (configHome) => {
+    const envPatch = getPlatformEnvPatch(configHome);
+    const vaultRoot = path.join(configHome, "Codex Obsidian");
+
+    await withEnv(envPatch, async () => {
+      await ensureVaultRoot({
+        vaultRoot,
+        relativeSubfolder: DEFAULT_SUBFOLDER,
+      });
+
+      await assert.doesNotReject(() => access(path.join(vaultRoot, ".obsidian")));
+    });
   });
 });
 
@@ -204,6 +242,7 @@ test("environment override uses CODEX_OBSIDIAN_VAULT", async () => {
 
         assert.equal(config.vaultRoot, "C:\\temp-vault");
         assert.equal(config.relativeSubfolder, DEFAULT_SUBFOLDER);
+        assert.equal(config.setupRequired, false);
       },
     );
   });

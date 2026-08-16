@@ -3,10 +3,12 @@ import os from "node:os";
 import path from "node:path";
 
 export const DEFAULT_SUBFOLDER = "Codex/Conversations";
+export const DEFAULT_VAULT_NAME = "Codex Obsidian";
 
 export interface VaultConfig {
   vaultRoot: string;
   relativeSubfolder: string;
+  setupRequired?: boolean;
 }
 
 export function normalizeRelativePath(input: string): string {
@@ -67,6 +69,10 @@ function getConfigPath(): string {
   return path.join(configHome, "codex-to-obsidian", "config.json");
 }
 
+function getDefaultVaultRoot(): string {
+  return path.join(os.homedir(), "Documents", DEFAULT_VAULT_NAME);
+}
+
 export async function loadConfig(): Promise<VaultConfig> {
   const vaultRootOverride = process.env.CODEX_OBSIDIAN_VAULT?.trim();
   const configPath = getConfigPath();
@@ -81,16 +87,33 @@ export async function loadConfig(): Promise<VaultConfig> {
         relativeSubfolder: normalizeRelativePath(
           parsedConfig.relativeSubfolder ?? DEFAULT_SUBFOLDER,
         ),
+        setupRequired: false,
       };
     } catch {
       return {
         vaultRoot: path.resolve(vaultRootOverride),
         relativeSubfolder: DEFAULT_SUBFOLDER,
+        setupRequired: false,
       };
     }
   }
 
-  const rawConfig = await readFile(configPath, "utf8");
+  let rawConfig: string;
+
+  try {
+    rawConfig = await readFile(configPath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return {
+        vaultRoot: getDefaultVaultRoot(),
+        relativeSubfolder: DEFAULT_SUBFOLDER,
+        setupRequired: true,
+      };
+    }
+
+    throw error;
+  }
+
   const parsedConfig = JSON.parse(rawConfig) as Partial<VaultConfig>;
   const relativeSubfolder = normalizeRelativePath(
     parsedConfig.relativeSubfolder ?? DEFAULT_SUBFOLDER,
@@ -106,7 +129,14 @@ export async function loadConfig(): Promise<VaultConfig> {
   return {
     vaultRoot: path.resolve(parsedConfig.vaultRoot.trim()),
     relativeSubfolder,
+    setupRequired: false,
   };
+}
+
+export async function ensureVaultRoot(config: VaultConfig): Promise<void> {
+  await mkdir(path.join(path.resolve(config.vaultRoot), ".obsidian"), {
+    recursive: true,
+  });
 }
 
 export async function saveConfig(config: VaultConfig): Promise<void> {
