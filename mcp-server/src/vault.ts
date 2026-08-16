@@ -169,25 +169,14 @@ function getVaultFolder(config: VaultConfig): string {
 }
 
 async function readMatchingMarkdownFiles(
-  directory: string,
+  logicalDirectory: string,
+  realDirectory: string,
   vaultRoot: string,
   codexKey: string,
-  realConfiguredFolder: string,
+  realConfiguredFolderReference: string,
   visitedDirectories = new Set<string>(),
 ): Promise<string[]> {
-  let realDirectory: string;
-
-  try {
-    realDirectory = await realpath(directory);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return [];
-    }
-
-    throw error;
-  }
-
-  assertContainedWithin(realConfiguredFolder, realDirectory);
+  assertContainedWithin(realConfiguredFolderReference, realDirectory);
 
   if (visitedDirectories.has(realDirectory)) {
     return [];
@@ -210,11 +199,12 @@ async function readMatchingMarkdownFiles(
   const matches: string[] = [];
 
   for (const entry of directoryEntries) {
-    const absolutePath = path.join(realDirectory, entry.name);
+    const logicalEntryPath = path.join(logicalDirectory, entry.name);
+    const realEntryCandidatePath = path.join(realDirectory, entry.name);
     let realEntryPath: string;
 
     try {
-      realEntryPath = await realpath(absolutePath);
+      realEntryPath = await realpath(realEntryCandidatePath);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         continue;
@@ -223,15 +213,16 @@ async function readMatchingMarkdownFiles(
       throw error;
     }
 
-    assertContainedWithin(realConfiguredFolder, realEntryPath);
+    assertContainedWithin(realConfiguredFolderReference, realEntryPath);
 
     if (entry.isDirectory()) {
       matches.push(
         ...(await readMatchingMarkdownFiles(
+          logicalEntryPath,
           realEntryPath,
           vaultRoot,
           codexKey,
-          realConfiguredFolder,
+          realConfiguredFolderReference,
           visitedDirectories,
         )),
       );
@@ -246,7 +237,7 @@ async function readMatchingMarkdownFiles(
     const noteCodexKey = await readFrontmatterValue(contents, "codex_key");
 
     if (noteCodexKey === codexKey) {
-      matches.push(toVaultRelativePath(vaultRoot, realEntryPath));
+      matches.push(toVaultRelativePath(vaultRoot, logicalEntryPath));
     }
   }
 
@@ -257,15 +248,29 @@ export async function findNote(
   config: VaultConfig,
   codexKey: string,
 ): Promise<string[]> {
-  const { realVaultRoot, configuredFolderPath } = await loadVaultContainment(
-    config,
-  );
+  const {
+    realVaultRoot,
+    realConfiguredFolderReference,
+  } = await loadVaultContainment(config);
   const vaultFolder = getVaultFolder(config);
+  let realVaultFolder: string;
+
+  try {
+    realVaultFolder = await realpath(vaultFolder);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
+  }
+
   const matches = await readMatchingMarkdownFiles(
     vaultFolder,
+    realVaultFolder,
     realVaultRoot,
     codexKey,
-    configuredFolderPath,
+    realConfiguredFolderReference,
   );
 
   return matches.sort((left, right) => left.localeCompare(right));

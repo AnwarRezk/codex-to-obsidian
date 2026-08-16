@@ -187,6 +187,64 @@ test("findNote returns no matches when the codex key is absent", async () => {
   });
 });
 
+test(
+  "configured folder symlink round-trips create, find, and update through the logical path",
+  {
+    skip: symlinkSupport.supported ? false : symlinkSupport.skipReason,
+  },
+  async () => {
+    const vaultRoot = await mkdtemp(path.join(os.tmpdir(), "codex-vault-"));
+    const logicalFolder = path.join(vaultRoot, "Codex", "Conversations");
+    const realFolder = path.join(vaultRoot, "Conversations-Real");
+    const config: VaultConfig = {
+      vaultRoot,
+      relativeSubfolder: DEFAULT_SUBFOLDER,
+    };
+
+    await mkdir(path.join(vaultRoot, "Codex"), { recursive: true });
+    await mkdir(realFolder, { recursive: true });
+
+    try {
+      await symlink(
+        realFolder,
+        logicalFolder,
+        process.platform === "win32" ? "junction" : "dir",
+      );
+
+      const draft = makeDraft({
+        title: "Logical round trip",
+        created: "2026-08-16T12:00:00Z",
+        updated: "2026-08-16T12:15:00Z",
+      });
+      const logicalPath = toRelativePath(draft);
+      const realPath = path.join(realFolder, buildFilename(draft.created, draft.title));
+
+      const created = await createNote(config, logicalPath, draft);
+      assert.equal(created.relativePath, logicalPath);
+      assert.deepEqual(await findNote(config, draft.codexKey), [logicalPath]);
+
+      const updatedDraft = makeDraft({
+        title: "Logical round trip",
+        created: draft.created,
+        updated: "2026-08-16T13:00:00Z",
+        summary: "Updated through the logical path.",
+      });
+      const foundPath = (await findNote(config, draft.codexKey))[0];
+
+      assert.ok(foundPath);
+      const updated = await updateNote(config, foundPath, updatedDraft);
+
+      assert.equal(updated.relativePath, logicalPath);
+      const updatedContents = await readFile(realPath, "utf8");
+
+      assert.match(updatedContents, /Updated through the logical path\./);
+      assert.match(updatedContents, /created: "2026-08-16T12:00:00Z"/);
+    } finally {
+      await rm(vaultRoot, { recursive: true, force: true });
+    }
+  },
+);
+
 test("update replaces a matching note without changing the created value", async () => {
   await withTempVault(async (config) => {
     const originalDraft = makeDraft();

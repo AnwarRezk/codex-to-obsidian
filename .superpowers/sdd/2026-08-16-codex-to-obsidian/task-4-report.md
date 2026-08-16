@@ -143,3 +143,58 @@ Output.
   "escapeFileMissing": true
 }
 ```
+
+## Fix Round 2
+
+Files changed.
+
+- `mcp-server/src/vault.ts`.
+- `mcp-server/test/vault.test.ts`.
+- `.superpowers/sdd/2026-08-16-codex-to-obsidian/progress.md`.
+- `.superpowers/sdd/2026-08-16-codex-to-obsidian/task-4-report.md`.
+
+How the review findings were addressed.
+
+- Split lookup into logical and real paths so `findNote()` returns logical vault-relative paths while still reading canonical filesystem paths for containment and file contents.
+- Passed the canonical configured-folder reference from `loadVaultContainment()` into lookup containment checks.
+- Added a disposable regression test for a configured-folder symlink or junction that points inside the vault and round-trips create, find, and update through the logical path.
+- Kept the existing out-of-vault junction regression and the no-overwrite and atomic update behavior intact.
+
+Exact commands run and outputs.
+
+```powershell
+node --experimental-strip-types --input-type=module -e "import fs from 'node:fs/promises'; import os from 'node:os'; import path from 'node:path'; import { pathToFileURL } from 'node:url'; const repo = 'C:/Users/arezk/Documents/Codex/2026-08-16/openai-s-current-harness-guidance-3/work/codex-to-obsidian/mcp-server/src'; const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-vault-round2-')); for (const name of ['config.ts','paths.ts','notes.ts','vault.ts']) { const source = await fs.readFile(path.join(repo, name), 'utf8'); const patched = source.replaceAll('./config.js', './config.ts').replaceAll('./paths.js', './paths.ts').replaceAll('./notes.js', './notes.ts'); await fs.writeFile(path.join(tempRoot, name), patched, 'utf8'); } const vault = await import(pathToFileURL(path.join(tempRoot, 'vault.ts')).href); const notes = await import(pathToFileURL(path.join(tempRoot, 'notes.ts')).href); const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-vault-data-')); const config = { vaultRoot, relativeSubfolder: 'Codex/Conversations' }; const logicalFolder = path.join(vaultRoot, 'Codex', 'Conversations'); const realFolder = path.join(vaultRoot, 'Conversations-Real'); await fs.mkdir(path.join(vaultRoot, 'Codex'), { recursive: true }); await fs.mkdir(realFolder, { recursive: true }); await fs.symlink(realFolder, logicalFolder, process.platform === 'win32' ? 'junction' : 'dir'); const draft = { title: 'Logical round trip', codexKey: 'logical-key', created: '2026-08-16T12:00:00Z', updated: '2026-08-16T12:15:00Z', summary: 'Initial summary.', decisions: ['One'], actionItems: ['Two'], openQuestions: ['Three'] }; const logicalPath = path.posix.join('Codex/Conversations', notes.buildFilename(draft.created, draft.title)); const realPath = path.join(realFolder, notes.buildFilename(draft.created, draft.title)); const created = await vault.createNote(config, logicalPath, draft); const matches = await vault.findNote(config, draft.codexKey); const updatedDraft = { ...draft, updated: '2026-08-16T13:00:00Z', summary: 'Updated through the logical path.' }; const updated = await vault.updateNote(config, matches[0], updatedDraft); const updatedContents = await fs.readFile(realPath, 'utf8'); console.log(JSON.stringify({ created, matches, updated, updatedHasCreated: updatedContents.includes('2026-08-16T12:00:00Z'), updatedHasSummary: updatedContents.includes('Updated through the logical path.') }, null, 2));"
+```
+
+Output.
+
+```json
+{
+  "created": {
+    "relativePath": "Codex/Conversations/2026-08-16 - Logical round trip.md",
+    "absolutePath": "C:\\Users\\arezk\\AppData\\Local\\Temp\\codex-vault-data-Y2qz7A\\Codex\\Conversations\\2026-08-16 - Logical round trip.md",
+    "codexKey": "logical-key"
+  },
+  "matches": [
+    "Codex/Conversations/2026-08-16 - Logical round trip.md"
+  ],
+  "updated": {
+    "relativePath": "Codex/Conversations/2026-08-16 - Logical round trip.md",
+    "absolutePath": "C:\\Users\\arezk\\AppData\\Local\\Temp\\codex-vault-data-Y2qz7A\\Codex\\Conversations\\2026-08-16 - Logical round trip.md",
+    "codexKey": "logical-key"
+  },
+  "updatedHasCreated": true,
+  "updatedHasSummary": true
+}
+```
+
+Spec compliance verdict.
+
+- Pass for logical-path round-tripping through a configured-folder symlink or junction inside the vault.
+- Lookup now returns vault-relative logical paths while filesystem reads stay on canonical real paths.
+- The in-vault symlink regression and the escape regression both remain covered.
+
+Limitations.
+
+- The workspace still does not have `tsx` or `tsc`, so the package scripts were not run here.
+- I verified the round-trip behavior with a bounded Node strip-types smoke check instead of installing dependencies.
