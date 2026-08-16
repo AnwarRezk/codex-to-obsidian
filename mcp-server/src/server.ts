@@ -1,12 +1,20 @@
 import { pathToFileURL } from "node:url";
-import { realpath, stat } from "node:fs/promises";
+import { mkdir, realpath, stat } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-import { loadConfig } from "./config.js";
+import {
+  DEFAULT_SUBFOLDER,
+  DEFAULT_VAULT_NAME,
+  ensureVaultRoot,
+  loadConfig,
+  saveConfig,
+} from "./config.js";
 import { buildObsidianOpenUri } from "./obsidian-uri.js";
 import { resolveVaultPath } from "./paths.js";
 import { createNote, findNote, updateNote } from "./vault.js";
@@ -30,7 +38,17 @@ type NotePayload = z.infer<typeof notePayloadSchema>;
 
 const statusResultSchema = z
   .object({
-    status: z.enum(["ready", "error"]),
+    status: z.enum(["setup_required", "ready", "error"]),
+    vaultRoot: z.string().optional(),
+    relativeSubfolder: z.string().optional(),
+    message: z.string().optional(),
+  })
+  .strict();
+
+const setupResultSchema = z
+  .object({
+    status: z.enum(["configured", "error"]),
+    vaultRoot: z.string().optional(),
     relativeSubfolder: z.string().optional(),
     message: z.string().optional(),
   })
@@ -83,6 +101,10 @@ function safeMessage(error: unknown): string {
     error instanceof Error ? error.message : typeof error === "string" ? error : "Unexpected server error";
   const normalized = rawMessage.toLowerCase();
 
+  if (normalized.includes("eacces") || normalized.includes("eperm") || normalized.includes("permission denied")) {
+    return "permission denied";
+  }
+
   if (normalized === "already exists" || normalized === "note already exists") {
     return "already exists";
   }
@@ -93,6 +115,14 @@ function safeMessage(error: unknown): string {
 
   if (normalized === "codex key missing" || normalized.includes("codex key is missing")) {
     return "codex key missing";
+  }
+
+  if (normalized === "setup required") {
+    return "setup required";
+  }
+
+  if (normalized === "required or invalid input") {
+    return "required or invalid input";
   }
 
   if (
@@ -132,6 +162,11 @@ function textResult(
 async function loadVaultConfigOrThrow() {
   try {
     const config = await loadConfig();
+    if (config.setupRequired) {
+      throw new Error("setup required");
+    }
+
+    await ensureVaultRoot(config);
     const realVaultRoot = await realpath(config.vaultRoot);
     const vaultStats = await stat(realVaultRoot);
 
@@ -142,9 +177,23 @@ async function loadVaultConfigOrThrow() {
     return {
       ...config,
     };
-  } catch {
+  } catch (error) {
+    const code = error as NodeJS.ErrnoException;
+    if (code.code === "EACCES" || code.code === "EPERM") {
+      throw new Error("permission denied");
+    }
+
     throw new Error("required or invalid config");
   }
+}
+
+function setupVaultRoot(input?: string): string {
+  const selected = input?.trim() || path.join(os.homedir(), "Documents", DEFAULT_VAULT_NAME);
+  if (!path.isAbsolute(selected)) {
+    throw new Error("required or invalid input");
+  }
+
+  return path.resolve(selected);
 }
 
 export function buildServer(): McpServer {
@@ -152,6 +201,49 @@ export function buildServer(): McpServer {
     name: "codex-to-obsidian",
     version: "0.1.0",
   });
+
+  server.registerTool(
+    "setup_vault",
+    {
+      description: "Configure and initialize the Obsidian vault used by the bridge",
+      inputSchema: z.object({
+        vaultRoot: z.string().trim().min(1).optional(),
+      }),
+      annotations: { destructiveHint: false, idempotentHint: true },
+      outputSchema: setupResultSchema,
+    },
+    async ({ vaultRoot }): Promise<CallToolResult> => {
+      try {
+        const config = {
+          vaultRoot: setupVaultRoot(vaultRoot),
+          relativeSubfolder: DEFAULT_SUBFOLDER,
+        };
+
+        await ensureVaultRoot(config);
+        await mkdir(resolveVaultPath(config, config.relativeSubfolder).absolutePath, {
+          recursive: true,
+        });
+        await saveConfig(config);
+
+        return textResult(`status=configured vaultRoot=${config.vaultRoot}`, {
+          status: "configured",
+          vaultRoot: config.vaultRoot,
+          relativeSubfolder: config.relativeSubfolder,
+        });
+      } catch (error) {
+        const message = safeMessage(error);
+
+        return {
+          content: [{ type: "text", text: `status=error message=${message}` }],
+          isError: true,
+          structuredContent: {
+            status: "error",
+            message,
+          },
+        };
+      }
+    },
+  );
 
   server.registerTool(
     "get_status",
@@ -163,6 +255,18 @@ export function buildServer(): McpServer {
     },
     async (): Promise<CallToolResult> => {
       try {
+        const initialConfig = await loadConfig();
+        if (initialConfig.setupRequired) {
+          return textResult(
+            `status=setup_required vaultRoot=${initialConfig.vaultRoot} relativeSubfolder=${initialConfig.relativeSubfolder}`,
+            {
+              status: "setup_required",
+              vaultRoot: initialConfig.vaultRoot,
+              relativeSubfolder: initialConfig.relativeSubfolder,
+            },
+          );
+        }
+
         const config = await loadVaultConfigOrThrow();
 
         return textResult(

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -70,12 +70,14 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
         "find_note",
         "get_status",
         "open_note",
+        "setup_vault",
         "update_note",
       ],
     );
     assert.equal(toolMap.get("get_status")?.annotations?.readOnlyHint, true);
     assert.equal(toolMap.get("find_note")?.annotations?.readOnlyHint, true);
     assert.equal(toolMap.get("open_note")?.annotations?.readOnlyHint, true);
+    assert.equal(toolMap.get("setup_vault")?.annotations?.idempotentHint, true);
     assert.equal(toolMap.get("create_note")?.annotations?.destructiveHint, false);
     assert.equal(toolMap.get("update_note")?.annotations?.destructiveHint, false);
     assert.ok(
@@ -212,27 +214,16 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
 
     process.env.CODEX_OBSIDIAN_VAULT = missingVaultRoot;
 
-    const errorResult = (await client.callTool({
+    const createdVaultResult = (await client.callTool({
       name: "get_status",
       arguments: {},
     })) as any;
 
-    assert.deepEqual(errorResult.structuredContent, {
-      status: "error",
-      message: "required or invalid config",
+    assert.deepEqual(createdVaultResult.structuredContent, {
+      status: "ready",
+      relativeSubfolder: "Codex/Conversations",
     });
-
-    assert.equal(errorResult.content[0]?.type, "text");
-    assert.equal(
-      errorResult.content[0] && "text" in errorResult.content[0]
-        ? errorResult.content[0].text
-        : "",
-      "status=error message=required or invalid config",
-    );
-    assert.doesNotMatch(
-      JSON.stringify(errorResult.structuredContent),
-      /[A-Za-z]:\\|[A-Za-z]:\//,
-    );
+    await rm(missingVaultRoot, { recursive: true, force: true });
 
     const unsafeVaultPath = path.join(os.tmpdir(), "codex-task5-unsafe-vault.txt");
     await writeFile(unsafeVaultPath, "not a folder", "utf8");
@@ -365,5 +356,56 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
     await client.close().catch(() => undefined);
     await server.close().catch(() => undefined);
     await rm(vaultRoot, { recursive: true, force: true });
+  }
+});
+
+test("first-run setup reports required, configures the default vault, and becomes ready", async () => {
+  const configHome = await mkdtemp(path.join(os.tmpdir(), "codex-task5-config-"));
+  const previousAppData = process.env.APPDATA;
+  const previousVault = process.env.CODEX_OBSIDIAN_VAULT;
+  delete process.env.CODEX_OBSIDIAN_VAULT;
+  process.env.APPDATA = configHome;
+
+  const server = buildServer();
+  const client = new Client({ name: "task5-setup", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+  try {
+    await Promise.all([
+      client.connect(clientTransport),
+      server.connect(serverTransport),
+    ]);
+
+    const statusBefore = await client.callTool({ name: "get_status", arguments: {} });
+    const defaultVaultRoot = path.resolve(os.homedir(), "Documents", "Codex Obsidian");
+
+    assert.deepEqual(statusBefore.structuredContent, {
+      status: "setup_required",
+      vaultRoot: defaultVaultRoot,
+      relativeSubfolder: "Codex/Conversations",
+    });
+
+    const configured = await client.callTool({ name: "setup_vault", arguments: {} });
+    assert.deepEqual(configured.structuredContent, {
+      status: "configured",
+      vaultRoot: defaultVaultRoot,
+      relativeSubfolder: "Codex/Conversations",
+    });
+    assert.equal(
+      await readFile(path.join(configHome, "codex-to-obsidian", "config.json"), "utf8"),
+      JSON.stringify({ vaultRoot: defaultVaultRoot, relativeSubfolder: "Codex/Conversations" }, null, 2) + "\n",
+    );
+
+    const statusAfter = await client.callTool({ name: "get_status", arguments: {} });
+    assert.deepEqual(statusAfter.structuredContent, {
+      status: "ready",
+      relativeSubfolder: "Codex/Conversations",
+    });
+  } finally {
+    process.env.APPDATA = previousAppData;
+    process.env.CODEX_OBSIDIAN_VAULT = previousVault;
+    await client.close().catch(() => undefined);
+    await server.close().catch(() => undefined);
+    await rm(configHome, { recursive: true, force: true });
   }
 });
