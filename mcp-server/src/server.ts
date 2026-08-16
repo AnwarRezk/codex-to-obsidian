@@ -136,7 +136,6 @@ async function loadVaultConfigOrThrow() {
 
     return {
       ...config,
-      vaultRoot: realVaultRoot,
     };
   } catch {
     throw new Error("Vault root is required in config");

@@ -20,3 +20,4 @@ Task 4: fix round 1/5 (added realpath containment, multiple-match coverage, and 
 Task 4: fix round 2/5 (split logical and real lookup paths so configured-folder symlinks round-trip through find/update; bounded Node smoke and diff checks passed; commit pending).
 Task 5: complete (Obsidian URI generation and MCP tool registration implemented; build and test passed; commit pending).
 Task 5: fix round 1/5 (redacted errors, switched wire names to `codex_key`, tightened tool output contracts, pinned `@types/node`, and expanded RPC smoke coverage; build, test, and diff check passed; commit pending).
+Task 5: fix round 2/5 (kept configured vault basenames for URI generation and added alias-root regression coverage; build, test, and diff check passed; commit pending).

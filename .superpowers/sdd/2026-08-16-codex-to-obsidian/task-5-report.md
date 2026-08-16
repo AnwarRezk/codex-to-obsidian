@@ -152,3 +152,63 @@ Spec compliance verdict.
 Limitations.
 
 - The CRLF warnings from `git diff --check` are the only remaining output, and they are benign in this Windows workspace.
+
+## Fix Round 2
+
+Files changed.
+
+- `mcp-server/src/server.ts`.
+- `mcp-server/test/task5.test.ts`.
+- `.superpowers/sdd/2026-08-16-codex-to-obsidian/progress.md`.
+
+How the review findings were addressed.
+
+- Kept `loadVaultConfigOrThrow()` validating the vault root with `realpath()` and `stat()` but returned the original configured `VaultConfig.vaultRoot` so `buildObsidianOpenUri()` keeps the configured vault basename.
+- Added a focused URI regression that proves an alias-style configured vault root retains its configured basename in the generated Obsidian URI.
+- Added an end-to-end alias-root smoke path that exercises `open_note` against a symlinked or junctioned vault root when the platform permits it.
+
+Exact commands run and outputs.
+
+```powershell
+npm run build
+```
+
+Output.
+
+```text
+> codex-to-obsidian-mcp-server@0.1.0 build
+> tsc -p tsconfig.json
+```
+
+```powershell
+npm test
+```
+
+Output.
+
+```text
+1..35
+# tests 35
+# pass 35
+# fail 0
+```
+
+```powershell
+git diff --check
+```
+
+Output.
+
+```text
+warning: in the working copy of 'mcp-server/src/server.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mcp-server/test/task5.test.ts', LF will be replaced by CRLF the next time Git touches it
+```
+
+Spec compliance verdict.
+
+- Pass for the vault-root basename regression and the alias-root URI coverage.
+
+Limitations.
+
+- The symlinked-root smoke path only runs when the platform allows creating the alias directory link.
+- The CRLF warnings from `git diff --check` remain benign in this Windows workspace.

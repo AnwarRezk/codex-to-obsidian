@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -10,6 +10,16 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { buildObsidianOpenUri } from "../src/obsidian-uri.js";
 import { buildServer } from "../src/server.js";
 
+function isPrivilegeError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    ((error as { code?: string }).code === "EPERM" ||
+      (error as { code?: string }).code === "EACCES")
+  );
+}
+
 test("buildObsidianOpenUri encodes vault and file values for obsidian://open", () => {
   const vaultRoot = path.join("C:", "Vault With Spaces");
   const relativePath = "Codex/Conversations/Project [draft].md";
@@ -17,6 +27,15 @@ test("buildObsidianOpenUri encodes vault and file values for obsidian://open", (
   assert.equal(
     buildObsidianOpenUri(vaultRoot, relativePath),
     "obsidian://open?vault=Vault%20With%20Spaces&file=Codex%2FConversations%2FProject%20%5Bdraft%5D.md",
+  );
+});
+
+test("buildObsidianOpenUri keeps the configured vault basename for alias roots", () => {
+  const vaultRoot = path.join("C:", "Alias Vault Root");
+
+  assert.match(
+    buildObsidianOpenUri(vaultRoot, "Codex/Conversations/Note.md"),
+    /vault=Alias%20Vault%20Root&file=Codex%2FConversations%2FNote\.md$/,
   );
 });
 
@@ -150,10 +169,7 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       message: "required or invalid config",
     });
 
-    assert.equal(
-      errorResult.content[0]?.type,
-      "text",
-    );
+    assert.equal(errorResult.content[0]?.type, "text");
     assert.equal(
       errorResult.content[0] && "text" in errorResult.content[0]
         ? errorResult.content[0].text
@@ -164,6 +180,73 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       JSON.stringify(errorResult.structuredContent),
       /[A-Za-z]:\\|[A-Za-z]:\//,
     );
+
+    const aliasTargetRoot = await mkdtemp(
+      path.join(os.tmpdir(), "codex-task5-alias-target-"),
+    );
+    const aliasRoot = path.join(os.tmpdir(), "codex-task5-alias-root");
+
+    try {
+      await mkdir(path.join(aliasTargetRoot, "Codex", "Conversations"), {
+        recursive: true,
+      });
+
+      try {
+        await symlink(
+          aliasTargetRoot,
+          aliasRoot,
+          process.platform === "win32" ? "junction" : "dir",
+        );
+      } catch (error) {
+        if (isPrivilegeError(error)) {
+          return;
+        }
+
+        throw error;
+      }
+
+      process.env.CODEX_OBSIDIAN_VAULT = aliasRoot;
+
+      const aliasServer = buildServer();
+      const aliasClient = new Client({
+        name: "task5-alias-smoke",
+        version: "1.0.0",
+      });
+      const [aliasClientTransport, aliasServerTransport] =
+        InMemoryTransport.createLinkedPair();
+
+      try {
+        await Promise.all([
+          aliasClient.connect(aliasClientTransport),
+          aliasServer.connect(aliasServerTransport),
+        ]);
+
+        const aliasResult = await aliasClient.callTool({
+          name: "open_note",
+          arguments: { relativePath: "Codex/Conversations/Note.md" },
+        });
+
+        assert.equal(aliasResult.structuredContent?.status, "ok");
+        assert.equal(
+          aliasResult.structuredContent?.relativePath,
+          "Codex/Conversations/Note.md",
+        );
+        assert.equal(
+          aliasResult.structuredContent &&
+            typeof aliasResult.structuredContent === "object"
+            ? (aliasResult.structuredContent as { uri?: string }).uri
+            : undefined,
+          buildObsidianOpenUri(aliasRoot, "Codex/Conversations/Note.md"),
+        );
+      } finally {
+        await aliasClient.close().catch(() => undefined);
+        await aliasServer.close().catch(() => undefined);
+      }
+    } finally {
+      process.env.CODEX_OBSIDIAN_VAULT = previousVault;
+      await rm(aliasRoot, { recursive: true, force: true });
+      await rm(aliasTargetRoot, { recursive: true, force: true });
+    }
   } finally {
     process.env.CODEX_OBSIDIAN_VAULT = previousVault;
     await client.close().catch(() => undefined);
