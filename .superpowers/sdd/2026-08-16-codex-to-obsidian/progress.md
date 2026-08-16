@@ -11,5 +11,8 @@ Task 2: fix round 1/5 (addressed test-runner wiring, env-root override subfolder
 Task 2: fix round 2/5 (addressed malformed/unusable config behavior under explicit CODEX_OBSIDIAN_VAULT override; commit 13a0e7f).
 Task 2: fix round 3/5 (removed redundant strict-path error wrapper; scoped re-review passed; commit f10a640).
 Task 2: complete (commits 11108f1..f10a640, scoped review clean; package test/build remain unrun because local tsx/tsc are unavailable).
+Task 3: fix round 1/5 (addressed reserved filenames, date-prefix stability, whitespace source URLs, and escaping-test mismatch; scoped re-review passed; commit db2695f).
+Task 3: complete (commits 412333a..db2695f, note renderer and operation policy reviewed clean; package test/build remain unrun because local tsx/tsc are unavailable).
 Task 2: complete (config and path safety implemented, with local smoke verification passed and package-local test/build tooling unavailable in this workspace).
 Task 3: complete (note rendering and operation policy implemented; local smoke verification passed; package-local tsx/tsc remain unavailable in this workspace).
+Task 4: complete (safe vault operations implemented; bounded Node smoke verification passed; package-local tsx/tsc remain unavailable in this workspace).
