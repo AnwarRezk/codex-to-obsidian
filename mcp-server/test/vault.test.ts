@@ -31,10 +31,19 @@ function makeDraft(overrides: Partial<NoteDraft> = {}): NoteDraft {
     codexKey: "codex-123",
     created: "2026-08-16T10:00:00Z",
     updated: "2026-08-16T10:30:00Z",
-    summary: "Keep scope small.",
-    decisions: ["Ship the smallest safe flow."],
-    actionItems: ["Verify create and update."],
-    openQuestions: ["Do we need more later?"],
+    body: [
+      "# Summary",
+      "Keep scope small.",
+      "",
+      "## Decisions",
+      "- Ship the smallest safe flow.",
+      "",
+      "## Action items",
+      "- Verify create and update.",
+      "",
+      "## Open questions",
+      "- Do we need more later?",
+    ].join("\n"),
     ...overrides,
   };
 }
@@ -227,7 +236,19 @@ test(
         title: "Logical round trip",
         created: draft.created,
         updated: "2026-08-16T13:00:00Z",
-        summary: "Updated through the logical path.",
+        body: [
+          "# Summary",
+          "Updated through the logical path.",
+          "",
+          "## Decisions",
+          "- Ship the smallest safe flow.",
+          "",
+          "## Action items",
+          "- Verify create and update.",
+          "",
+          "## Open questions",
+          "- Do we need more later?",
+        ].join("\n"),
       });
       const foundPath = (await findNote(config, draft.codexKey))[0];
 
@@ -252,8 +273,19 @@ test("update replaces a matching note without changing the created value", async
     const originalPath = resolveVaultPath(config, relativePath);
     const updatedDraft = makeDraft({
       updated: "2026-08-17T09:15:00Z",
-      summary: "Keep the vault flow tiny.",
-      decisions: ["Ship the guarded update."],
+      body: [
+        "# Summary",
+        "Keep the vault flow tiny.",
+        "",
+        "## Decisions",
+        "- Ship the guarded update.",
+        "",
+        "## Action items",
+        "- Verify create and update.",
+        "",
+        "## Open questions",
+        "- Do we need more later?",
+      ].join("\n"),
     });
 
     await createNote(config, relativePath, originalDraft);
@@ -284,7 +316,19 @@ test("update refuses a mismatched codex key without changing the source note", a
     const mismatchedDraft = makeDraft({
       codexKey: "different-codex-key",
       updated: "2026-08-17T09:15:00Z",
-      summary: "This must not be written.",
+      body: [
+        "# Summary",
+        "This must not be written.",
+        "",
+        "## Decisions",
+        "- Ship the smallest safe flow.",
+        "",
+        "## Action items",
+        "- Verify create and update.",
+        "",
+        "## Open questions",
+        "- Do we need more later?",
+      ].join("\n"),
     });
 
     await createNote(config, relativePath, originalDraft);

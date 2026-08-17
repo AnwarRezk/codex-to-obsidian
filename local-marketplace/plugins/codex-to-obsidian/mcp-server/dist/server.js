@@ -16,11 +16,7 @@ const notePayloadSchema = z.object({
     relativePath: relativePathSchema,
     created: z.string().trim().min(1),
     updated: z.string().trim().min(1),
-    summary: z.string(),
-    decisions: z.array(z.string()),
-    actionItems: z.array(z.string()),
-    openQuestions: z.array(z.string()),
-    sourceUrl: z.string().trim().min(1).optional(),
+    body: z.string().trim().min(1),
 });
 const statusResultSchema = z
     .object({
@@ -69,11 +65,7 @@ function toDraft(payload) {
         codexKey: payload.codex_key,
         created: payload.created,
         updated: payload.updated,
-        summary: payload.summary,
-        decisions: payload.decisions,
-        actionItems: payload.actionItems,
-        openQuestions: payload.openQuestions,
-        sourceUrl: payload.sourceUrl,
+        body: payload.body,
     };
 }
 function safeMessage(error) {

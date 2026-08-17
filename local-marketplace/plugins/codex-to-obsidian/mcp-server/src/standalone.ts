@@ -38,11 +38,7 @@ interface NotePayload {
   relativePath: string;
   created: string;
   updated: string;
-  summary: string;
-  decisions: string[];
-  actionItems: string[];
-  openQuestions: string[];
-  sourceUrl?: string;
+  body: string;
 }
 
 export const toolDefinitions = [
@@ -107,11 +103,7 @@ function noteInputSchema() {
       relativePath: { type: "string" },
       created: { type: "string" },
       updated: { type: "string" },
-      summary: { type: "string" },
-      decisions: { type: "array", items: { type: "string" } },
-      actionItems: { type: "array", items: { type: "string" } },
-      openQuestions: { type: "array", items: { type: "string" } },
-      sourceUrl: { type: "string" },
+      body: { type: "string" },
     },
     required: [
       "title",
@@ -119,10 +111,7 @@ function noteInputSchema() {
       "relativePath",
       "created",
       "updated",
-      "summary",
-      "decisions",
-      "actionItems",
-      "openQuestions",
+      "body",
     ],
     additionalProperties: false,
   };
@@ -206,13 +195,6 @@ function asString(value: unknown): string {
   return value;
 }
 
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
-    throw new Error("required or invalid input");
-  }
-  return value;
-}
-
 function asNotePayload(value: unknown): NotePayload {
   if (!value || typeof value !== "object") throw new Error("required or invalid input");
   const input = value as Record<string, unknown>;
@@ -222,13 +204,8 @@ function asNotePayload(value: unknown): NotePayload {
     relativePath: asString(input.relativePath),
     created: asString(input.created),
     updated: asString(input.updated),
-    summary: typeof input.summary === "string" ? input.summary : (() => { throw new Error("required or invalid input"); })(),
-    decisions: asStringArray(input.decisions),
-    actionItems: asStringArray(input.actionItems),
-    openQuestions: asStringArray(input.openQuestions),
+    body: asString(input.body),
   };
-
-  if (input.sourceUrl !== undefined) payload.sourceUrl = asString(input.sourceUrl);
   return payload;
 }
 
@@ -238,11 +215,7 @@ function toDraft(payload: NotePayload) {
     codexKey: payload.codex_key,
     created: payload.created,
     updated: payload.updated,
-    summary: payload.summary,
-    decisions: payload.decisions,
-    actionItems: payload.actionItems,
-    openQuestions: payload.openQuestions,
-    sourceUrl: payload.sourceUrl,
+    body: payload.body,
   };
 }
 
