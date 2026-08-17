@@ -48,4 +48,9 @@ test("skill packaging mirrors split Obsidian workflows without source metadata",
   ]) {
     assert.doesNotMatch(markdown, /sourceUrl|source_url|Source conversation/i);
   }
+
+  for (const markdown of [rootSave, packagedSave]) {
+    assert.match(markdown, /Save this conversation to Obsidian\./);
+    assert.doesNotMatch(markdown, /detailed Obsidian Markdown note/i);
+  }
 });

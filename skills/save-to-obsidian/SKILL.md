@@ -1,6 +1,6 @@
 ---
 name: save-to-obsidian
-description: Use when Codex desktop is asked to save, record, or convert the conversation into a detailed Obsidian Markdown note.
+description: Use when Codex desktop is asked to save, record, or convert the conversation to Obsidian.
 ---
 
 # Save To Obsidian
@@ -29,7 +29,7 @@ Use `open_note` only when the user asks for a link after the write; it returns a
 
 ## Workflow
 
-1. Trigger when the user asks to save, record, or convert the conversation into a detailed Obsidian Markdown note.
+1. Trigger when the user asks to save, record, or convert the conversation to Obsidian.
 2. Call `get_status` before doing any note lookup.
 3. If the result is `setup_required`, ask once: `Which Obsidian vault should I use? Provide an existing absolute folder path, or say create a new vault.`
 4. If the user provides an existing absolute folder path, call `setup_vault` with that `vaultRoot`.
@@ -51,7 +51,7 @@ Use `open_note` only when the user asks for a link after the write; it returns a
 
 ## Example
 
-User: Save this conversation to Obsidian as a detailed note.
+User: Save this conversation to Obsidian.
 You: I will turn it into a detailed Markdown note in `Codex/Conversations/` and confirm the target path before writing.
 
 ## Common Mistakes
