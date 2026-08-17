@@ -38,7 +38,6 @@ interface NotePayload {
   relativePath: string;
   created: string;
   updated: string;
-  body?: string;
   summary: string;
   decisions: string[];
   actionItems: string[];
@@ -223,7 +222,6 @@ function asNotePayload(value: unknown): NotePayload {
     relativePath: asString(input.relativePath),
     created: asString(input.created),
     updated: asString(input.updated),
-    body: typeof input.body === "string" ? input.body : undefined,
     summary: typeof input.summary === "string" ? input.summary : (() => { throw new Error("required or invalid input"); })(),
     decisions: asStringArray(input.decisions),
     actionItems: asStringArray(input.actionItems),
@@ -235,32 +233,16 @@ function asNotePayload(value: unknown): NotePayload {
 }
 
 function toDraft(payload: NotePayload) {
-  const body =
-    payload.body ??
-    [
-      "# Summary",
-      payload.summary,
-      "",
-      "## Decisions",
-      ...(payload.decisions.length > 0 ? payload.decisions.map((decision) => `- ${decision}`) : ["None"]),
-      "",
-      "## Action items",
-      ...(payload.actionItems.length > 0
-        ? payload.actionItems.map((item) => `- ${item}`)
-        : ["None"]),
-      "",
-      "## Open questions",
-      ...(payload.openQuestions.length > 0
-        ? payload.openQuestions.map((question) => `- ${question}`)
-        : ["None"]),
-    ].join("\n");
-
   return {
     title: payload.title,
     codexKey: payload.codex_key,
     created: payload.created,
     updated: payload.updated,
-    body,
+    summary: payload.summary,
+    decisions: payload.decisions,
+    actionItems: payload.actionItems,
+    openQuestions: payload.openQuestions,
+    sourceUrl: payload.sourceUrl,
   };
 }
 
