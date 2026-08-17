@@ -9,6 +9,26 @@ It does not search the full vault, delete notes, or write outside the configured
 It does not automate the Obsidian user interface.
 It does not export a verbatim transcript.
 
+```mermaid
+flowchart TD
+    request[User requests a summary or detailed save] --> workflow{Select workflow}
+    workflow --> summarize[summarize-to-obsidian]
+    workflow --> save[save-to-obsidian]
+    summarize --> status[get_status]
+    save --> status
+    status --> setup{Vault configured?}
+    setup -->|No| configure[setup_vault with existing or new vault]
+    setup -->|Yes| body[Generate confirmed Markdown body]
+    configure --> body
+    body --> confirm[Confirm target path and operation]
+    confirm --> lookup[find_note by codex_key]
+    lookup --> operation{Operation}
+    operation -->|Default match| update[update_note]
+    operation -->|No match or explicit save| create[create_note]
+    update --> vault[Write inside Codex/Conversations]
+    create --> vault
+```
+
 ## Install From The Codex App
 
 1. Open Codex.
