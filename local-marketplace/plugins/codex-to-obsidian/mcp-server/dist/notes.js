@@ -69,33 +69,6 @@ function normalizeBody(body) {
     }
     return trimmed;
 }
-function renderLegacyBody(draft) {
-    const legacyDraft = draft;
-    const summary = legacyDraft.summary ?? "";
-    const decisions = legacyDraft.decisions ?? [];
-    const actionItems = legacyDraft.actionItems ?? [];
-    const openQuestions = legacyDraft.openQuestions ?? [];
-    const sourceUrl = legacyDraft.sourceUrl?.trim();
-    const sections = [
-        "# Summary",
-        summary,
-        "",
-        "## Decisions",
-        ...(decisions.length > 0 ? decisions.map((decision) => `- ${decision}`) : ["None"]),
-        "",
-        "## Action items",
-        ...(actionItems.length > 0 ? actionItems.map((item) => `- ${item}`) : ["None"]),
-        "",
-        "## Open questions",
-        ...(openQuestions.length > 0 ? openQuestions.map((question) => `- ${question}`) : ["None"]),
-        "",
-        "## Source conversation",
-        sourceUrl
-            ? `[Open the original Codex conversation](${sourceUrl})`
-            : "Source conversation: unavailable",
-    ].join("\n");
-    return normalizeBody(sections);
-}
 export function renderNote(draft) {
     const frontmatterLines = [
         "---",
@@ -105,9 +78,7 @@ export function renderNote(draft) {
         `updated: ${yamlQuote(draft.updated)}`,
         "---",
     ];
-    const body = draft.body !== undefined
-        ? normalizeBody(draft.body)
-        : renderLegacyBody(draft);
+    const body = normalizeBody(draft.body);
     return [...frontmatterLines, "", ...body.split("\n")].join("\n");
 }
 export function buildFilename(created, title) {

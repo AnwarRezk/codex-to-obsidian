@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -88,6 +89,15 @@ test("renderNote preserves multiline markdown bodies", () => {
       "const answer = 42;",
       "```",
     ].join("\n"),
+  );
+});
+
+test("notes renderer source exposes only the body contract", async () => {
+  const source = await readFile(new URL("../src/notes.ts", import.meta.url), "utf8");
+
+  assert.doesNotMatch(
+    source,
+    /renderLegacyBody|summary|sourceUrl|source_url|source conversation|unavailable/i,
   );
 });
 
