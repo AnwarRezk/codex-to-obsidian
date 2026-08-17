@@ -33,6 +33,28 @@ test("standalone MCP runtime exposes the vault tools without SDK imports", async
     ["create_note", "find_note", "get_status", "open_note", "setup_vault", "update_note"],
   );
   assert.ok(toolDefinitions.every((tool) => tool.inputSchema.type === "object"));
+  const toolMap = new Map(
+    ((tools?.result as { tools: Array<{ name: string; inputSchema: { required?: string[] } }> }).tools).map((tool) => [
+      tool.name,
+      tool,
+    ]),
+  );
+  assert.deepEqual(toolMap.get("create_note")?.inputSchema.required, [
+    "title",
+    "codex_key",
+    "relativePath",
+    "created",
+    "updated",
+    "body",
+  ]);
+  assert.deepEqual(toolMap.get("update_note")?.inputSchema.required, [
+    "title",
+    "codex_key",
+    "relativePath",
+    "created",
+    "updated",
+    "body",
+  ]);
 });
 
 test("standalone setup_vault accepts an optional absolute vaultRoot", async () => {

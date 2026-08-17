@@ -84,7 +84,13 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       toolMap.get("create_note")?.inputSchema?.required?.includes("codex_key"),
     );
     assert.ok(
+      toolMap.get("create_note")?.inputSchema?.required?.includes("body"),
+    );
+    assert.ok(
       toolMap.get("find_note")?.inputSchema?.required?.includes("codex_key"),
+    );
+    assert.ok(
+      toolMap.get("update_note")?.inputSchema?.required?.includes("body"),
     );
 
     const status = await client.callTool({
@@ -103,11 +109,7 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       relativePath,
       created: "2026-08-16T10:00:00Z",
       updated: "2026-08-16T10:30:00Z",
-      summary: "Keep the handler surface tight.",
-      decisions: ["Use codex_key on the wire."],
-      actionItems: ["Verify the MCP result shapes."],
-      openQuestions: ["Does the redacted error stay generic?"],
-      sourceUrl: "https://example.test/share/codex-123",
+      body: ["# Summary", "Keep the handler surface tight.", "", "## Decisions", "- Use codex_key on the wire."].join("\n"),
     };
 
     const created = await client.callTool({
@@ -120,6 +122,10 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       relativePath,
       codex_key: "codex-123",
     });
+    const createdNote = await readFile(path.join(vaultRoot, relativePath), "utf8");
+    assert.match(createdNote, /# Summary\nKeep the handler surface tight\./);
+    assert.doesNotMatch(createdNote, /source_url:/i);
+    assert.doesNotMatch(createdNote, /## Source conversation/);
 
     const duplicateCreated = (await client.callTool({
       name: "create_note",
@@ -154,7 +160,7 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       arguments: {
         ...draft,
         updated: "2026-08-16T11:00:00Z",
-        summary: "Updated through the tool call.",
+        body: ["# Summary", "Updated through the tool call.", "", "## Decisions", "- Use codex_key on the wire."].join("\n"),
       },
     });
 
@@ -163,6 +169,10 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
       relativePath,
       codex_key: "codex-123",
     });
+    const updatedNote = await readFile(path.join(vaultRoot, relativePath), "utf8");
+    assert.match(updatedNote, /# Summary\nUpdated through the tool call\./);
+    assert.doesNotMatch(updatedNote, /source_url:/i);
+    assert.doesNotMatch(updatedNote, /## Source conversation/);
 
     const unsafeRelativePathError = (await client.callTool({
       name: "create_note",
@@ -295,11 +305,7 @@ test("Task 5 tool RPCs accept codex_key inputs and redact errors", async () => {
           relativePath: "Codex/Conversations/Note.md",
           created: "2026-08-16T12:00:00Z",
           updated: "2026-08-16T12:15:00Z",
-          summary: "Created through the alias root.",
-          decisions: [],
-          actionItems: [],
-          openQuestions: [],
-          sourceUrl: "https://example.test/share/alias-key",
+          body: ["# Summary", "Created through the alias root."].join("\n"),
         };
 
         const aliasCreated = await aliasClient.callTool({
