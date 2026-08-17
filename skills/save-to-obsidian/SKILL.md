@@ -1,6 +1,6 @@
 ---
 name: save-to-obsidian
-description: Use when Codex desktop is asked to save, record, or convert the conversation to Obsidian.
+description: Use when Codex desktop is asked to save, record, convert, or update the conversation in Obsidian.
 ---
 
 # Save To Obsidian
@@ -29,7 +29,7 @@ Use `open_note` only when the user asks for a link after the write; it returns a
 
 ## Workflow
 
-1. Trigger when the user asks to save, record, or convert the conversation to Obsidian.
+1. Trigger when the user asks to save, record, convert, or update the conversation in Obsidian.
 2. Call `get_status` before doing any note lookup.
 3. If the result is `setup_required`, ask once: `Which Obsidian vault should I use? Provide an existing absolute folder path, or say create a new vault.`
 4. If the user provides an existing absolute folder path, call `setup_vault` with that `vaultRoot`.
@@ -38,16 +38,18 @@ Use `open_note` only when the user asks for a link after the write; it returns a
 7. Do not ask for the vault again after setup is `ready`; reuse the persisted configuration for later saves in every project.
 8. Ask only when vault setup is missing or matching notes are ambiguous.
 9. Generate one short filesystem-safe title, and preserve that title and relative path on updates.
-10. Write one confirmed Markdown `body` string.
+10. Generate one Markdown `body` string.
 11. Include chronology, context, technical details, files and commands, failures and resolutions, decisions, constraints, and next steps in the digest.
 12. Organize the content so the note reads like a useful technical handoff rather than a raw transcript.
 13. Do not reproduce the conversation line by line.
-14. Ask for confirmation immediately before any create or update write, and include the target path and operation.
-15. Pass the MCP write schema: `title`, `codex_key`, `relativePath`, `created`, `updated`, and `body`.
-16. Use `find_note`, `create_note`, `update_note`, and `get_status` as needed.
-17. Use `open_note` only to obtain a validated Obsidian URI, and never claim that it opened the app.
-18. If setup or a write returns `permission denied`, stop retrying and ask the user to rerun with Full Access or approve the configured vault path.
-19. Never fall back to Computer Use or direct built-in filesystem writes for this workflow.
+14. Call `find_note` before deciding the operation or asking for write confirmation.
+15. Resolve the target path and operation from the match, explicit request, and collision results; ask when matching notes are ambiguous.
+16. Ask for confirmation immediately before any create or update write, and include the resolved target path and operation.
+17. Pass the MCP write schema: `title`, `codex_key`, `relativePath`, `created`, `updated`, and `body`.
+18. Use `find_note`, `create_note`, `update_note`, and `get_status` as needed.
+19. Use `open_note` only to obtain a validated Obsidian URI, and never claim that it opened the app.
+20. If setup or a write returns `permission denied`, stop retrying and ask the user to rerun with Full Access or approve the configured vault path.
+21. Never fall back to Computer Use or direct built-in filesystem writes for this workflow.
 
 ## Example
 

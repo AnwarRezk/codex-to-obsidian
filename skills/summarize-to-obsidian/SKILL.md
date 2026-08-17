@@ -38,15 +38,16 @@ Use `open_note` only when the user asks for a link after the write; it returns a
 7. Do not ask for the vault again after setup is `ready`; reuse the persisted configuration for later saves in every project.
 8. Ask only when vault setup is missing or matching notes are ambiguous.
 9. Generate one short filesystem-safe title, and preserve that title and relative path on updates.
-10. Write one confirmed Markdown `body` string.
-11. Use these sections in this order: `# Summary`, `## Context`, `## Key points`, `## Decisions`, `## Action items`, `## Open questions`, and `## Next steps`.
-12. Preserve important reasoning, concrete outcomes, and useful technical detail instead of generic one-line bullets.
-13. Ask for confirmation immediately before any create or update write, and include the target path and operation.
-14. Pass the MCP write schema: `title`, `codex_key`, `relativePath`, `created`, `updated`, and `body`.
-15. Use `find_note`, `create_note`, `update_note`, and `get_status` as needed.
-16. Use `open_note` only to obtain a validated Obsidian URI, and never claim that it opened the app.
-17. If setup or a write returns `permission denied`, stop retrying and ask the user to rerun with Full Access or approve the configured vault path.
-18. Never fall back to Computer Use or direct built-in filesystem writes for this workflow.
+10. Generate one Markdown `body` string using these sections in this order: `# Summary`, `## Context`, `## Key points`, `## Decisions`, `## Action items`, `## Open questions`, and `## Next steps`.
+11. Preserve important reasoning, concrete outcomes, and useful technical detail instead of generic one-line bullets.
+12. Call `find_note` before deciding the operation or asking for write confirmation.
+13. Resolve the target path and operation from the match, explicit request, and collision results; ask when matching notes are ambiguous.
+14. Ask for confirmation immediately before any create or update write, and include the resolved target path and operation.
+15. Pass the MCP write schema: `title`, `codex_key`, `relativePath`, `created`, `updated`, and `body`.
+16. Use `find_note`, `create_note`, `update_note`, and `get_status` as needed.
+17. Use `open_note` only to obtain a validated Obsidian URI, and never claim that it opened the app.
+18. If setup or a write returns `permission denied`, stop retrying and ask the user to rerun with Full Access or approve the configured vault path.
+19. Never fall back to Computer Use or direct built-in filesystem writes for this workflow.
 
 ## Example
 

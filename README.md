@@ -20,11 +20,11 @@ flowchart TD
     setup -->|No| configure[setup_vault with existing or new vault]
     setup -->|Yes| body[Generate confirmed Markdown body]
     configure --> body
-    body --> confirm[Confirm target path and operation]
-    confirm --> lookup[find_note by codex_key]
-    lookup --> operation{Operation}
-    operation -->|Default match| update[update_note]
-    operation -->|No match or explicit save| create[create_note]
+    body --> lookup[find_note by codex_key]
+    lookup --> operation{Resolve operation and target}
+    operation --> confirm[Confirm target path and operation]
+    confirm -->|Default match| update[update_note]
+    confirm -->|No match or explicit save| create[create_note]
     update --> vault[Write inside Codex/Conversations]
     create --> vault
 ```
