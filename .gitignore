@@ -3,7 +3,12 @@ dist/
 mcp-server/node_modules/
 mcp-server/dist/
 .DS_Store
-.superpowers/
+
+# Private planning and agent execution artifacts
+**/.superpowers/
+docs/superpowers/
+task-*-brief.md
+task-*-report.md
 
 !local-marketplace/plugins/codex-to-obsidian/mcp-server/dist/
 !local-marketplace/plugins/codex-to-obsidian/mcp-server/dist/*.js
