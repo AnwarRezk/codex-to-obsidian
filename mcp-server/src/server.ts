@@ -27,6 +27,7 @@ const notePayloadSchema = z.object({
   relativePath: relativePathSchema,
   created: z.string().trim().min(1),
   updated: z.string().trim().min(1),
+  body: z.string().optional(),
   summary: z.string(),
   decisions: z.array(z.string()),
   actionItems: z.array(z.string()),
@@ -83,16 +84,32 @@ const openResultSchema = z
   .strict();
 
 function toDraft(payload: NotePayload) {
+  const body =
+    payload.body ??
+    [
+      "# Summary",
+      payload.summary,
+      "",
+      "## Decisions",
+      ...(payload.decisions.length > 0 ? payload.decisions.map((decision) => `- ${decision}`) : ["None"]),
+      "",
+      "## Action items",
+      ...(payload.actionItems.length > 0
+        ? payload.actionItems.map((item) => `- ${item}`)
+        : ["None"]),
+      "",
+      "## Open questions",
+      ...(payload.openQuestions.length > 0
+        ? payload.openQuestions.map((question) => `- ${question}`)
+        : ["None"]),
+    ].join("\n");
+
   return {
     title: payload.title,
     codexKey: payload.codex_key,
     created: payload.created,
     updated: payload.updated,
-    summary: payload.summary,
-    decisions: payload.decisions,
-    actionItems: payload.actionItems,
-    openQuestions: payload.openQuestions,
-    sourceUrl: payload.sourceUrl,
+    body,
   };
 }
 

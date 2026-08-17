@@ -3,14 +3,10 @@ export interface NoteFrontmatter {
   codexKey: string;
   created: string;
   updated: string;
-  sourceUrl?: string;
 }
 
 export interface NoteDraft extends NoteFrontmatter {
-  summary: string;
-  decisions: readonly string[];
-  actionItems: readonly string[];
-  openQuestions: readonly string[];
+  body: string;
 }
 
 export interface SelectOperationInput {
@@ -22,15 +18,6 @@ export type NoteOperation = "create" | "update";
 
 function yamlQuote(value: string): string {
   return JSON.stringify(value);
-}
-
-function escapeMarkdownLinkTarget(value: string): string {
-  return value
-    .replaceAll("\\", "\\\\")
-    .replaceAll("[", "\\[")
-    .replaceAll("]", "\\]")
-    .replaceAll("(", "\\(")
-    .replaceAll(")", "\\)");
 }
 
 function normalizeDatePrefix(created: string): string {
@@ -100,58 +87,38 @@ function sanitizeTitleForFilename(title: string): string {
   return cleaned;
 }
 
-function normalizeSourceUrl(sourceUrl?: string): string | undefined {
-  const trimmed = sourceUrl?.trim();
+function normalizeBody(body: string): string {
+  const normalized = body.replaceAll("\r\n", "\n");
+  const lines = normalized.split("\n");
 
-  return trimmed ? trimmed : undefined;
-}
-
-function formatSection(title: string, bodyLines: readonly string[]): string[] {
-  return [title, ...bodyLines, ""];
-}
-
-function renderList(items: readonly string[]): string[] {
-  if (items.length === 0) {
-    return ["None"];
+  while (lines.length > 0 && lines[0]?.trim() === "") {
+    lines.shift();
   }
 
-  return items.map((item) => `- ${item}`);
+  while (lines.length > 0 && lines.at(-1)?.trim() === "") {
+    lines.pop();
+  }
+
+  const trimmed = lines.join("\n");
+
+  if (!trimmed) {
+    throw new Error("Body is required");
+  }
+
+  return trimmed;
 }
 
 export function renderNote(draft: NoteDraft): string {
-  const sourceUrl = normalizeSourceUrl(draft.sourceUrl);
   const frontmatterLines = [
     "---",
     `title: ${yamlQuote(draft.title)}`,
     `codex_key: ${yamlQuote(draft.codexKey)}`,
     `created: ${yamlQuote(draft.created)}`,
     `updated: ${yamlQuote(draft.updated)}`,
-    ...(sourceUrl ? [`source_url: ${yamlQuote(sourceUrl)}`] : []),
     "---",
   ];
 
-  const sections = [
-    formatSection("# Summary", draft.summary.split(/\r?\n/)),
-    formatSection("## Decisions", renderList(draft.decisions)),
-    formatSection("## Action items", renderList(draft.actionItems)),
-    formatSection("## Open questions", renderList(draft.openQuestions)),
-    formatSection(
-      "## Source conversation",
-      sourceUrl
-        ? [
-            `[Open the original Codex conversation](${escapeMarkdownLinkTarget(sourceUrl)})`,
-          ]
-        : ["Source conversation: unavailable"],
-    ),
-  ];
-
-  const lines = [...frontmatterLines, ...sections.flat()];
-
-  while (lines.at(-1) === "") {
-    lines.pop();
-  }
-
-  return lines.join("\n");
+  return [...frontmatterLines, "", ...normalizeBody(draft.body).split("\n")].join("\n");
 }
 
 export function buildFilename(created: string, title: string): string {
