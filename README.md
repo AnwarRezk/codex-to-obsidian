@@ -10,7 +10,7 @@ It does not automate the Obsidian user interface.
 It does not export a verbatim transcript.
 
 ```mermaid
-flowchart TD
+flowchart LR
     request[User requests a summary or detailed save] --> workflow{Select workflow}
     workflow --> summarize[summarize-to-obsidian]
     workflow --> save[save-to-obsidian]
@@ -27,6 +27,7 @@ flowchart TD
     confirm -->|No match or explicit save| create[create_note]
     update --> vault[Write inside Codex/Conversations]
     create --> vault
+    vault -->|User requests a link| open[open_note]
 ```
 
 ## Install From The Codex App
@@ -85,7 +86,9 @@ It also creates the `.obsidian` marker folder and the `Codex/Conversations` subf
 After setup returns `configured`, later saves reuse the persisted configuration.
 The skills do not ask for the vault again unless the saved configuration is missing or invalid.
 
-## Usage Examples
+## Commands You Can Use
+
+These are natural-language commands entered in Codex after the plugin is installed.
 
 Use `summarize-to-obsidian` when you want a structured summary.
 
@@ -96,10 +99,29 @@ Use `save-to-obsidian` when you want a fuller technical handoff.
 
 - `Save this conversation to Obsidian.`
 - `Save this discussion to Obsidian with the commands, failures, and resolutions.`
+- `Update this conversation in Obsidian.`
+- `Save this conversation to Obsidian and give me the Obsidian link.`
 
 An explicit `save` always creates a new note.
 An explicit `update` updates the matching note after confirmation.
 Without an explicit operation, the skills update when a matching note exists and create a note otherwise.
+
+## MCP Server Actions
+
+The local MCP server exposes these actions to the two Obsidian skills.
+
+| Action | Purpose | Input |
+| --- | --- | --- |
+| `get_status` | Check whether the vault is configured and ready. | None. |
+| `setup_vault` | Save the vault location and create the configured note folder. | Optional `vaultRoot`. |
+| `find_note` | Find notes in `Codex/Conversations` by `codex_key`. | `codex_key`. |
+| `create_note` | Create a new Markdown note without overwriting an existing file. | `title`, `codex_key`, `relativePath`, `created`, `updated`, and `body`. |
+| `update_note` | Replace an existing matching note after confirmation. | `title`, `codex_key`, `relativePath`, `created`, `updated`, and `body`. |
+| `open_note` | Return a validated `obsidian://` URI for a note. | `relativePath`. |
+
+The normal action sequence is `get_status`, optional `setup_vault`, `find_note`, confirmation, and then `create_note` or `update_note`.
+The skills call `open_note` only when the user asks for an Obsidian link.
+The server writes the supplied Markdown body and does not add a source-conversation section or source link.
 
 ## Platform Configuration
 
