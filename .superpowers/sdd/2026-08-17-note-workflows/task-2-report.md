@@ -50,3 +50,35 @@ Results:
 
 No functional concerns from this task’s scoped verification.
 `git diff` emitted LF to CRLF working-copy warnings for the edited files on Windows, but verification still passed and no additional file changes were introduced by that warning.
+
+## Review Fix Follow-up
+
+Review finding: `mcp-server/test/standalone.test.ts` only verified `tools/list` required fields and did not exercise the standalone create and update write path.
+
+Added a new standalone regression test that:
+
+- configures a temporary vault through the standalone JSON-RPC handler,
+- calls `create_note` with a body-only payload,
+- reads the serialized note from disk and asserts it contains the Markdown body,
+- asserts the serialized note omits both `source_url:` and `## Source conversation`,
+- calls `update_note` with a revised body string, and
+- re-reads the serialized note to confirm the updated body persists without source metadata.
+
+Ran focused standalone verification:
+
+```powershell
+Set-Location mcp-server
+npm test -- test/standalone.test.ts
+```
+
+Result: passed with `39` tests passed and `0` failed.
+The new standalone write-path test passed immediately, which indicates the review finding was missing regression coverage rather than a runtime bug in `src/standalone.ts`.
+
+Ran full regression verification again:
+
+```powershell
+Set-Location mcp-server
+npm test
+```
+
+Result: passed with `39` tests passed and `0` failed.
