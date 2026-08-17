@@ -1,6 +1,6 @@
 {
   "name": "codex-to-obsidian",
-  "version": "0.1.0+codex.20260816145946",
+  "version": "0.1.0+codex.local-20260817-090654",
   "description": "Save Codex conversation summaries as safe, updateable Markdown notes in Obsidian.",
   "author": {
     "name": "Local developer"
