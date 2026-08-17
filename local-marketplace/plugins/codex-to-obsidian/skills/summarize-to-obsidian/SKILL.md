@@ -1,14 +1,14 @@
 ---
-name: save-conversation
-description: Use when Codex desktop is asked to save, update, record, or write a conversation summary to Obsidian.
+name: summarize-to-obsidian
+description: Use when Codex desktop is asked for a summary or asked to summarize the conversation to Obsidian.
 ---
 
-# Save Conversation
+# Summarize To Obsidian
 
 ## Overview
 
 Use this only for Obsidian note writes from Codex desktop.
-The note is a summary, not a transcript.
+The note is a rich structured summary, not a transcript.
 The default folder is `Codex/Conversations/`.
 
 ## Tool boundary
@@ -29,7 +29,7 @@ Use `open_note` only when the user asks for a link after the write; it returns a
 
 ## Workflow
 
-1. Trigger only when the user explicitly asks to save, update, record, or make an Obsidian note.
+1. Trigger only when the user asks for a summary or asks to summarize the conversation to Obsidian.
 2. Call `get_status` before doing any note lookup.
 3. If the result is `setup_required`, ask once: `Which Obsidian vault should I use? Provide an existing absolute folder path, or say create a new vault.`
 4. If the user provides an existing absolute folder path, call `setup_vault` with that `vaultRoot`.
@@ -38,32 +38,28 @@ Use `open_note` only when the user asks for a link after the write; it returns a
 7. Do not ask for the vault again after setup is `ready`; reuse the persisted configuration for later saves in every project.
 8. Ask only when vault setup is missing or matching notes are ambiguous.
 9. Generate one short filesystem-safe title, and preserve that title and relative path on updates.
-10. Write only these five sections in this order.
-11. `# Summary`.
-12. `## Decisions`.
-13. `## Action items`.
-14. `## Open questions`.
-15. `## Source conversation`.
-16. Include a real source URL only if Codex has one or the user confirms one.
-17. Use `unavailable` when no real source URL exists.
-18. Ask for confirmation immediately before any create or update write, and include the target path and operation.
-19. Pass the MCP write schema: `title`, `codex_key`, `relativePath`, `created`, `updated`, `summary`, `decisions`, `actionItems`, `openQuestions`, and optional `sourceUrl`.
-20. Use `find_note`, `create_note`, `update_note`, and `get_status` as needed.
-21. Use `open_note` only to obtain a validated Obsidian URI, and never claim that it opened the app.
-22. If setup or a write returns `permission denied`, stop retrying and ask the user to rerun with Full Access or approve the configured vault path.
-23. Never fall back to Computer Use or direct built-in filesystem writes for this workflow.
+10. Generate one Markdown `body` string using these sections in this order: `# Summary`, `## Context`, `## Key points`, `## Decisions`, `## Action items`, `## Open questions`, and `## Next steps`.
+11. Preserve important reasoning, concrete outcomes, and useful technical detail instead of generic one-line bullets.
+12. Call `find_note` before deciding the operation or asking for write confirmation.
+13. Resolve the target path and operation from the match, explicit request, and collision results; ask when matching notes are ambiguous.
+14. Ask for confirmation immediately before any create or update write, and include the resolved target path and operation.
+15. Pass the MCP write schema: `title`, `codex_key`, `relativePath`, `created`, `updated`, and `body`.
+16. Use `find_note`, `create_note`, `update_note`, and `get_status` as needed.
+17. Use `open_note` only to obtain a validated Obsidian URI, and never claim that it opened the app.
+18. If setup or a write returns `permission denied`, stop retrying and ask the user to rerun with Full Access or approve the configured vault path.
+19. Never fall back to Computer Use or direct built-in filesystem writes for this workflow.
 
 ## Example
 
-User: Save this conversation to Obsidian.
-You: I will summarize it into `Codex/Conversations/` and confirm the target path before writing.
+User: Summarize this conversation to Obsidian.
+You: I will save a structured summary into `Codex/Conversations/` and confirm the target path before writing.
 
 ## Common Mistakes
 
-- Adding a full transcript or Canvas output.
-- Reordering sections or adding extra sections.
+- Writing a transcript instead of a summary.
+- Reordering the required sections or omitting one.
+- Flattening the content into generic bullets with no concrete outcomes.
 - Changing the title or path during an update.
-- Inventing a source link.
 - Writing before confirmation.
 - Asking for the vault again after setup has already completed.
 - Claiming Obsidian opened after receiving only a URI.

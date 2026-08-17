@@ -1,14 +1,6 @@
 function yamlQuote(value) {
     return JSON.stringify(value);
 }
-function escapeMarkdownLinkTarget(value) {
-    return value
-        .replaceAll("\\", "\\\\")
-        .replaceAll("[", "\\[")
-        .replaceAll("]", "\\]")
-        .replaceAll("(", "\\(")
-        .replaceAll(")", "\\)");
-}
 function normalizeDatePrefix(created) {
     const trimmed = created.trim();
     const datePrefix = trimmed.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
@@ -62,46 +54,32 @@ function sanitizeTitleForFilename(title) {
     }
     return cleaned;
 }
-function normalizeSourceUrl(sourceUrl) {
-    const trimmed = sourceUrl?.trim();
-    return trimmed ? trimmed : undefined;
-}
-function formatSection(title, bodyLines) {
-    return [title, ...bodyLines, ""];
-}
-function renderList(items) {
-    if (items.length === 0) {
-        return ["None"];
+function normalizeBody(body) {
+    const normalized = body.replaceAll("\r\n", "\n");
+    const lines = normalized.split("\n");
+    while (lines.length > 0 && lines[0]?.trim() === "") {
+        lines.shift();
     }
-    return items.map((item) => `- ${item}`);
+    while (lines.length > 0 && lines.at(-1)?.trim() === "") {
+        lines.pop();
+    }
+    const trimmed = lines.join("\n");
+    if (!trimmed) {
+        throw new Error("Body is required");
+    }
+    return trimmed;
 }
 export function renderNote(draft) {
-    const sourceUrl = normalizeSourceUrl(draft.sourceUrl);
     const frontmatterLines = [
         "---",
         `title: ${yamlQuote(draft.title)}`,
         `codex_key: ${yamlQuote(draft.codexKey)}`,
         `created: ${yamlQuote(draft.created)}`,
         `updated: ${yamlQuote(draft.updated)}`,
-        ...(sourceUrl ? [`source_url: ${yamlQuote(sourceUrl)}`] : []),
         "---",
     ];
-    const sections = [
-        formatSection("# Summary", draft.summary.split(/\r?\n/)),
-        formatSection("## Decisions", renderList(draft.decisions)),
-        formatSection("## Action items", renderList(draft.actionItems)),
-        formatSection("## Open questions", renderList(draft.openQuestions)),
-        formatSection("## Source conversation", sourceUrl
-            ? [
-                `[Open the original Codex conversation](${escapeMarkdownLinkTarget(sourceUrl)})`,
-            ]
-            : ["Source conversation: unavailable"]),
-    ];
-    const lines = [...frontmatterLines, ...sections.flat()];
-    while (lines.at(-1) === "") {
-        lines.pop();
-    }
-    return lines.join("\n");
+    const body = normalizeBody(draft.body);
+    return [...frontmatterLines, "", ...body.split("\n")].join("\n");
 }
 export function buildFilename(created, title) {
     const datePart = normalizeDatePrefix(created);
